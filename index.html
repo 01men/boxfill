@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>装柜数量计算器 · 集装箱装载方案</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   装柜数量计算器 —— 单文件零依赖工具
+   · 可单独分发给装柜工人
+   · 也可由 dsh-lc-parser 插件调用（URL hash 预填箱规，见 applyHash）
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --ink:#101828; --muted:#475467; --faint:#98a2b3; --line:#e4e7ec;
+  --bg:#fff; --soft:#f7f9fc; --blue:#1f4e8c; --blue2:#2f6fb5; --blueSoft:#eaf1fa;
+  --green:#0f7b3d; --greenSoft:#e8f6ec; --greenLine:#8fd3a6;
+  --amber:#b45309; --amberSoft:#fdf4e7;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--ink); background:var(--bg); line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1480px;margin:0 auto;padding:16px 18px 40px}
+
+.page-head{display:flex;align-items:flex-end;gap:14px;padding-bottom:12px;border-bottom:2px solid var(--blue);margin-bottom:16px;flex-wrap:wrap}
+.page-head h1{font-size:22px;font-weight:800;letter-spacing:-.01em;color:var(--blue)}
+.page-head .sub{font-size:13px;color:var(--muted)}
+.page-head .spacer{flex:1}
+
+.layout{display:grid;grid-template-columns:360px 1fr;gap:16px;align-items:start}
+@media (max-width:1080px){ .layout{grid-template-columns:1fr} }
+
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+
+/* 分段标题 ▌xxx */
+.sec-title{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--blue);margin:0 0 10px}
+.sec-title::before{content:"";width:4px;height:14px;background:var(--blue);border-radius:2px;flex-shrink:0}
+.sec-title .hint{font-weight:400;font-size:11.5px;color:var(--faint);margin-left:2px}
+
+.row{display:flex;gap:8px;margin-bottom:8px}
+.row>*{flex:1;min-width:0}
+label.f{display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+input[type=number],input[type=text]{
+  width:100%;padding:6px 8px;font-size:13px;color:var(--ink);background:var(--bg);
+  border:1px solid #cdd5e0;border-radius:6px;outline:none;font-variant-numeric:tabular-nums;
+}
+input[type=number]:focus{border-color:var(--blue2);box-shadow:0 0 0 3px var(--blueSoft)}
+input[type=checkbox]{width:auto;margin:0;flex-shrink:0}
+.note{font-size:11px;color:var(--faint);margin-top:3px}
+
+/* 模式切换 */
+.seg{display:flex;border:1px solid #cdd5e0;border-radius:6px;overflow:hidden}
+.seg button{flex:1;padding:7px 4px;font-size:13px;border:none;background:var(--bg);color:var(--muted);cursor:pointer;font-weight:500}
+.seg button.on{background:var(--blue);color:#fff;font-weight:600}
+
+/* 柜型按钮 */
+.types{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+.types button{padding:5px 11px;font-size:12px;border:1px solid #cdd5e0;border-radius:5px;background:var(--bg);color:var(--muted);cursor:pointer}
+.types button.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+
+/* 方向勾选 */
+.dirs{display:flex;flex-direction:column;gap:6px}
+.dir{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:6px;cursor:pointer;background:var(--bg)}
+.dir:hover{border-color:#b9c6d8;background:var(--soft)}
+.dir input{margin-top:2px}
+.dir.on{border-color:var(--blue2);background:var(--blueSoft)}
+.dir .dmain{font-size:12.5px;font-weight:600}
+.dir .dsub{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dir .bad{color:#c0392b}
+.dir .off{color:var(--faint)}
+
+.btn{width:100%;padding:9px;font-size:13.5px;border-radius:7px;cursor:pointer;font-weight:600;border:1px solid var(--blue);background:var(--blue);color:#fff}
+.btn:hover:not(:disabled){background:#17406f}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:var(--bg);color:var(--blue);border-color:var(--blue)}
+.btn.ghost:hover:not(:disabled){background:var(--blueSoft)}
+.btn.sm{padding:6px;font-size:12.5px;font-weight:500}
+.btn.auto{width:auto;padding:7px 14px}
+
+/* 方案对比 Top3 */
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:760px){ .plans{grid-template-columns:1fr} }
+.plan{border:1px solid var(--line);border-radius:9px;padding:11px 12px;cursor:pointer;background:var(--bg)}
+.plan:hover{border-color:#b9c6d8}
+.plan.best{border:2px solid var(--greenLine);background:var(--greenSoft)}
+.plan .pname{font-size:12.5px;font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.plan .pbig{font-size:26px;font-weight:800;line-height:1.15;letter-spacing:-.02em}
+.plan .pbig small{font-size:12px;font-weight:500;color:var(--muted);margin-left:3px}
+.plan .pmeta{font-size:11.5px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+
+/* 指标条 */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:10px}
+.metric{border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:center}
+.metric.good{background:var(--greenSoft);border-color:var(--greenLine)}
+.metric.warn{background:var(--amberSoft);border-color:#f0d3a0}
+.metric .mv{font-size:22px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2}
+.metric.good .mv{color:var(--green)}
+.metric.warn .mv{color:var(--amber)}
+.metric .mk{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+.compare{background:var(--blueSoft);border:1px solid #c6dcf2;border-radius:8px;padding:9px 12px;font-size:13px;margin-top:10px;color:#12405f}
+.compare b{color:var(--blue)}
+
+/* 重心条 */
+.cog .axis{display:flex;align-items:center;gap:8px;margin:10px 0 2px}
+.cog .alab{font-size:11.5px;color:var(--muted);width:52px;flex-shrink:0}
+.cog .abar{flex:1;height:16px;background:#eceff3;border-radius:4px;position:relative;overflow:hidden}
+.cog .afill{position:absolute;top:0;bottom:0;left:0}
+.cog .amark{position:absolute;top:0;bottom:0;width:2px;background:#c0392b}
+.cog .aends{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint)}
+
+/* 方向明细 */
+.odetails{display:flex;flex-direction:column;gap:6px}
+.odetail{display:flex;align-items:center;gap:9px;padding:7px 10px;border:1px solid var(--line);border-radius:7px}
+.odot{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+.odetail .on{font-size:12.5px;font-weight:600;flex:1}
+.odetail .os{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.odetail .oc{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;min-width:62px;text-align:right}
+
+/* 视图 */
+.viewtabs{display:flex;gap:5px;margin-bottom:9px;flex-wrap:wrap;align-items:center}
+.viewtabs button{padding:5px 12px;font-size:12.5px;border:1px solid #cdd5e0;background:var(--bg);color:var(--muted);border-radius:6px;cursor:pointer}
+.viewtabs button.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.viewbox{position:relative;background:#f4f6f9;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.viewbox canvas{display:block;width:100%;height:auto;touch-action:none}
+.viewhint{position:absolute;right:10px;bottom:9px;font-size:11px;color:var(--muted);background:rgba(255,255,255,.86);padding:3px 8px;border-radius:20px}
+.legend{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:11.5px;line-height:1.7}
+.legend .lrow{display:flex;align-items:center;gap:6px}
+
+.layerbar{display:flex;align-items:center;gap:7px;margin-bottom:9px;flex-wrap:wrap}
+.layerbar button{padding:5px 11px;font-size:12.5px;border:1px solid #cdd5e0;background:var(--bg);border-radius:6px;cursor:pointer;color:var(--muted)}
+.layerbar button.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.layerbar .linfo{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.empty{padding:34px 16px;text-align:center;color:var(--faint);font-size:13.5px}
+.warnbox{background:var(--amberSoft);border:1px solid #f0d3a0;border-radius:7px;padding:8px 11px;font-size:12.5px;color:#8a4708;margin:0 auto;max-width:520px}
+
+/* 打印报告（屏幕上隐藏） */
+#print-report{display:none}
+@media print{
+  body{background:#fff}
+  .no-print{display:none!important}
+  #print-report{display:block;padding:0}
+  .wrap{max-width:none;padding:0}
+  @page{size:A4;margin:12mm}
+}
+.ptitle{font-size:17px;font-weight:800;color:var(--blue);border-bottom:2px solid var(--blue);padding-bottom:5px;margin-bottom:10px}
+.psec{font-size:12.5px;font-weight:700;color:var(--blue);margin:11px 0 5px;padding-left:6px;border-left:3px solid var(--blue)}
+.ptable{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px}
+.ptable th,.ptable td{border:1px solid #bbb;padding:4px 6px;text-align:left}
+.ptable th{background:#eef2f7;font-weight:700}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pblock{border:1px solid #bbb;border-radius:5px;padding:6px 8px;font-size:11px;break-inside:avoid}
+.pblock .pk{color:#666;font-size:10px}
+.pblock .pv{font-weight:700;font-size:12.5px}
+.player{break-inside:avoid;margin-bottom:7px}
+.player img{width:100%;border:1px solid #ccc;border-radius:4px}
+.player .plc{font-size:10.5px;color:#555;margin-bottom:2px}
+.pfoot{margin-top:12px;padding-top:6px;border-top:1px dashed #aaa;font-size:9.5px;color:#666;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<div class="wrap no-print">
+  <div class="page-head">
+    <h1>装柜数量计算器</h1>
+    <div class="sub">集装箱装载方案 · 3D 装柜图 / 分层俯视图 / 装柜方案报告</div>
+    <div class="spacer"></div>
+    <button class="btn ghost sm auto" id="btnPrint" disabled>导出 PDF 装柜图与报告</button>
+  </div>
+
+  <div class="layout">
+    <!-- ══════════ 左：参数 ══════════ -->
+    <div>
+      <div class="card">
+        <div class="sec-title">装柜模式</div>
+        <div class="seg" id="modeSeg">
+          <button data-mode="mixed" class="on">混合方向</button>
+          <button data-mode="single">单一方向</button>
+        </div>
+        <div class="note" id="modeNote">遍历 6 种摆放方向，多策略寻优 + 二次塞缝，把端头缝隙与剩余空间尽量补满。</div>
+      </div>
+
+      <div class="card">
+        <div class="sec-title">集装箱信息</div>
+        <div class="types" id="typeBtns"></div>
+        <div class="row">
+          <div><label class="f">长 (mm)</label><input type="number" id="cL" min="1" step="1"></div>
+          <div><label class="f">宽 (mm)</label><input type="number" id="cW" min="1" step="1"></div>
+          <div><label class="f">高 (mm)</label><input type="number" id="cH" min="1" step="1"></div>
+        </div>
+        <div class="note">内部尺寸，默认值为标准柜内尺寸</div>
+      </div>
+
+      <div class="card">
+        <div class="sec-title">纸箱信息</div>
+        <div class="row">
+          <div><label class="f">长 (mm)</label><input type="number" id="bL" min="1" step="1"></div>
+          <div><label class="f">宽 (mm)</label><input type="number" id="bW" min="1" step="1"></div>
+          <div><label class="f">高 (mm)</label><input type="number" id="bH" min="1" step="1"></div>
+        </div>
+        <div class="row"><div><label class="f">单箱毛重 (kg)</label><input type="number" id="bWt" min="0" step="0.01"></div></div>
+        <div class="row"><div><label class="f">最大堆码层数 (0 = 不限)</label><input type="number" id="maxLayer" min="0" step="1" value="0"></div></div>
+        <div class="row"><div><label class="f">预留装卸间隙 (mm/边)</label><input type="number" id="gap" min="0" step="1" value="0"></div></div>
+        <div class="row"><div><label class="f">待装数量 (0 = 尽可能多装)</label><input type="number" id="qty" min="0" step="1" value="0"></div></div>
+        <div class="row" style="align-items:center;gap:7px">
+          <input type="checkbox" id="allowRotate" checked>
+          <label class="f" style="margin:0;cursor:pointer">允许旋转（纸箱高作为长/宽）</label>
+        </div>
+        <div class="row" style="align-items:center;gap:7px">
+          <input type="checkbox" id="useSecondPass" checked>
+          <label class="f" style="margin:0;cursor:pointer">启用二次塞缝优化</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="sec-title">允许的摆放方向</div>
+        <div class="dirs" id="dirList"></div>
+        <div style="display:flex;gap:6px;margin-top:9px">
+          <button class="btn ghost sm" id="dirAll">全选</button>
+          <button class="btn ghost sm" id="dirNone">全不选</button>
+        </div>
+      </div>
+
+      <button class="btn" id="btnCalc">计算最优装柜方案</button>
+    </div>
+
+    <!-- ══════════ 右：结果 ══════════ -->
+    <div>
+      <div class="card" id="resultTop" style="display:none">
+        <div class="sec-title">方案对比（Top 3）<span class="hint">点击卡片切换当前方案</span></div>
+        <div class="plans" id="planList"></div>
+      </div>
+
+      <div class="card" id="resultMain" style="display:none">
+        <div class="sec-title">当前方案结果 <span class="hint" id="planName"></span></div>
+        <div class="compare" id="compareBar"></div>
+        <div class="metrics" id="metricGrid"></div>
+      </div>
+
+      <div class="card" id="resultCog" style="display:none">
+        <div class="sec-title">重心与重量分布</div>
+        <div id="cogBox"></div>
+      </div>
+
+      <div class="card" id="resultOri" style="display:none">
+        <div class="sec-title">各方向装箱明细</div>
+        <div class="odetails" id="oriList"></div>
+      </div>
+
+      <div class="card" id="resultView" style="display:none">
+        <div class="sec-title">装柜示意图</div>
+        <div class="viewtabs">
+          <button data-view="3d" class="on">3D 立体图</button>
+          <button data-view="layer">分层俯视图</button>
+          <div style="flex:1"></div>
+          <span style="font-size:11.5px;color:var(--muted)" id="viewExtra"></span>
+        </div>
+
+        <div id="view3d">
+          <div class="viewbox">
+            <canvas id="c3d" width="900" height="470"></canvas>
+            <div class="legend" id="legend3d"></div>
+            <div class="viewhint">拖拽旋转 · 滚轮缩放</div>
+          </div>
+        </div>
+
+        <div id="viewLayer" style="display:none">
+          <div class="layerbar" id="layerBar"></div>
+          <div class="viewbox">
+            <canvas id="cLayer" width="900" height="470"></canvas>
+            <div class="viewhint" id="layerHint"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty" id="emptyBox">填好左边的柜型与箱规，点「计算最优装柜方案」。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 打印报告（仅打印时可见） ══════════ -->
+<div id="print-report"></div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════
+   装柜数量计算器
+
+   算法说明（为什么这么做）
+   ─────────────────────
+   真实装柜是"分层码"的：先铺一层，铺满再往上堆。因此按层求解：
+
+     对每一层：
+       1. 把允许的每种朝向投影到柜底平面，得到若干矩形
+       2. 用「极点法」（Extreme Point）在柜底 2D 装箱
+       3. 本层高度 = 本层实际放到的箱子里最高的那个
+       4. 层高累加，直到超出柜内高或超过最大堆码层数
+
+   极点法为什么比简单网格更适合混合码：网格只能整齐排布，遇到端头缝隙就浪费；
+   极点法每次把箱子放到"最低最靠左"的可行位置，天然会让长箱子先放、把剩余空间
+   留给能填进去的小方向。
+
+   多策略寻优：不同策略偏好不同（面积优先 / 高度优先 / 同向为主 / 左下优先），
+   每种策略跑一遍完整装柜，取箱数最多的前 3 个作为 Top3 对比。
+
+   二次塞缝：主装箱靠"极点"推进，极点耗尽时柜底往往还剩一条缝；这一遍直接
+   扫格点，把主装箱因极点耗尽而漏掉的边角空间补上。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ───────── 柜型预设（内部尺寸 mm） ───────── */
+const CONTAINERS = {
+  '20GP': { L: 5898,  W: 2352, H: 2393 },
+  '40GP': { L: 12032, W: 2352, H: 2393 },
+  '40HQ': { L: 12032, W: 2352, H: 2698 },
+  '45HQ': { L: 13756, W: 2352, H: 2698 },
+};
+
+/* ───────── 6 种摆放方向 ─────────
+   d = [占柜长, 占柜宽, 占层高]。六个排列覆盖 (L,W,H) 的全部摆放方式。
+   不允许旋转时，只保留层高仍为纸箱原高的两个方向（不倒置）。 */
+const DIRS = [
+  { key:'L×W×H', name:'正常堆放', d:['L','W','H'], tip:'纸箱高朝下' },
+  { key:'L×H×W', name:'长面侧放', d:['L','H','W'], tip:'纸箱长朝下' },
+  { key:'W×L×H', name:'宽面侧放', d:['W','L','H'], tip:'纸箱宽朝下' },
+  { key:'W×H×L', name:'倒面侧放', d:['W','H','L'], tip:'纸箱宽朝下' },
+  { key:'H×L×W', name:'横放',     d:['H','L','W'], tip:'纸箱高朝前' },
+  { key:'H×W×L', name:'卧放',     d:['H','W','L'], tip:'纸箱高朝侧' },
+];
+const DIR_COLORS = ['#4a90d9','#e8833a','#5cb85c','#f2c744','#9b6dd6','#3fb5b5','#d96b8f','#8a9b6e'];
+
+/* ───────── 状态 ───────── */
+const state = {
+  mode: 'mixed',
+  ctype: '20GP',
+  cL: 5898, cW: 2352, cH: 2393,
+  bL: 600, bW: 400, bH: 350,
+  bWt: 15, maxLayer: 0, gap: 0, qty: 0,
+  allowRotate: true, useSecondPass: true,
+  dirs: DIRS.map(() => true),
+  plans: [], active: 0,
+  view: '3d', layerIdx: 0,
+  yaw: -0.62, pitch: 0.62, zoom: 1, drag: null,
+};
+
+const EPS = 1e-6;
+/* ═══════════════════════════════════════════════════════
+   装箱内核：极大矩形法（MaxRects）
+   ═══════════════════════════════════════════════════════ */
+
+/** 纸箱某朝向的实际占位（含间隙）。 */
+function orientSize(dims) {
+  return { dx: dims[0] + state.gap, dy: dims[1] + state.gap, dz: dims[2] + state.gap };
+}
+
+/** 第 i 个方向在当前纸箱尺寸下的三边长度。 */
+function dirDims(i) {
+  return DIRS[i].d.map(k => (k === 'L' ? state.bL : k === 'W' ? state.bW : state.bH));
+}
+
+/** 生成全部可放方向（尺寸含间隙，放不进柜子的剔除）。 */
+function buildOpts() {
+  const opts = [];
+  DIRS.forEach((meta, index) => {
+    if (!state.dirs[index]) return;
+    // 不允许旋转时不倒置（层高 ≠ 纸箱原高）
+    if (!state.allowRotate && meta.d[2] !== 'H') return;
+    const o = orientSize(dirDims(index));
+    if (o.dx > state.cL + EPS || o.dy > state.cW + EPS || o.dz > state.cH + EPS) return;
+    opts.push({ index, key: meta.key, name: meta.name, dx: o.dx, dy: o.dy, dz: o.dz, area: o.dx * o.dy });
+  });
+  return opts;
+}
+
+/** 物理上限：即使全部按最省地方向整齐码也放不下这么多箱。用作兜底，防止死循环。 */
+function capacityUpperBound(opts) {
+  let perLayer = 0;
+  for (const o of opts) {
+    const n = Math.floor(state.cL / o.dx) * Math.floor(state.cW / o.dy);
+    if (n > perLayer) perLayer = n;
+  }
+  let layers = 0;
+  for (const o of opts) {
+    const n = Math.floor(state.cH / o.dz);
+    if (n > layers) layers = n;
+  }
+  if (state.maxLayer > 0) layers = Math.min(layers, state.maxLayer);
+  return perLayer * layers;
+}
+
+/** 两个矩形是否重叠（正接触不算重叠）。 */
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.w - EPS && a.x + a.w > b.x + EPS &&
+         a.y < b.y + b.h - EPS && a.y + a.h > b.y + EPS;
+}
+
+/** outer 是否完全包含 inner。 */
+function rectContains(outer, inner) {
+  return inner.x >= outer.x - EPS && inner.y >= outer.y - EPS &&
+         inner.x + inner.w <= outer.x + outer.w + EPS &&
+         inner.y + inner.h <= outer.y + outer.h + EPS;
+}
+
+/** 去掉被其它矩形包含的空闲矩形（只留极大矩形）。 */
+function pruneFreeRects(free) {
+  const out = [];
+  for (let i = 0; i < free.length; i++) {
+    let contained = false;
+    for (let j = 0; j < free.length; j++) {
+      if (i === j) continue;
+      const same = free[j].x === free[i].x && free[j].y === free[i].y &&
+                   free[j].w === free[i].w && free[j].h === free[i].h;
+      if (!same && rectContains(free[j], free[i])) { contained = true; break; }
+    }
+    if (!contained) out.push(free[i]);
+  }
+  return out;
+}
+
+/**
+ * 极大矩形法 2D 装箱：一层里尽可能多放，占位可混用不同朝向。
+ *
+ * 为什么不用"极点 / 扫描线"那类算法：它们的空闲空间是靠"候选点"间接表达的，
+ * 一旦候选列表被裁剪或去重，就可能漏掉仍然合法的空位，把箱子放到已占用区域上
+ * ——表现就是装出一柜 20,000 箱的荒谬结果。极大矩形法把空闲空间显式维护成互不
+ * 重叠的矩形列表，每步放置都从真实空闲区取，放不下就是真的放不下，物理上不会越界。
+ *
+ * @param opts 本层可放方向（含 dx/dy/dz/index/area）
+ * @param prefer(o) 选方向的偏好，值越小越优先
+ * @param limit 本层箱数上限
+ * @returns [{x, y, di, dz}]
+ */
+function packLayer(binL, binW, opts, prefer, limit) {
+  let free = [{ x: 0, y: 0, w: binL, h: binW }];
+  const placed = [];
+
+  while (placed.length < limit && free.length > 0) {
+    // 在"放得下的 (空闲矩形, 方向)"组合里挑最优：先看 prefer，再看浪费面积
+    let best = null;
+    for (const fr of free) {
+      for (const o of opts) {
+        if (o.dx > fr.w + EPS || o.dy > fr.h + EPS) continue;
+        const waste = fr.w * fr.h - o.area;
+        if (!best) { best = { fr, o, waste }; continue; }
+        const better = prefer(o) < prefer(best.o) - EPS
+          || (Math.abs(prefer(o) - prefer(best.o)) <= EPS && waste < best.waste - EPS);
+        if (better) best = { fr, o, waste };
+      }
+    }
+    if (!best) break;
+
+    const { fr, o } = best;
+    placed.push({ x: fr.x, y: fr.y, di: o.index, dz: o.dz });
+
+    // 落位后把被覆盖的空闲矩形切成右条与下条
+    const box = { x: fr.x, y: fr.y, w: o.dx, h: o.dy };
+    const next = [];
+    for (const r of free) {
+      if (!rectsOverlap(r, box)) { next.push(r); continue; }
+      if (r.x + r.w > box.x + box.w + EPS) {
+        next.push({ x: box.x + box.w, y: r.y, w: r.x + r.w - (box.x + box.w), h: r.h });
+      }
+      if (r.y + r.h > box.y + box.h + EPS) {
+        next.push({ x: r.x, y: box.y + box.h, w: r.w, h: r.y + r.h - (box.y + box.h) });
+      }
+    }
+    free = pruneFreeRects(next);
+  }
+
+  return placed;
+}
+
+/* ───────── 策略 ─────────
+   prefer(o) 返回该方向的"放置优先级"，值越小越优先。策略之间的差别在于
+   它们对"这一层该优先用哪个方向"给出不同答案，从而探索出不同布局。 */
+const STRATEGIES = [
+  { key:'bestfit',  name:'贴合优先', desc:'优先选与当前空位尺寸最接近的方向，把每块空间都填满',
+    prefer: o => o.dx + o.dy },
+  { key:'area',     name:'面积优先', desc:'优先用底面积最大的方向打底，最大化铺满柜底',
+    prefer: o => -o.area },
+  { key:'lowlayer', name:'低层优先', desc:'优先选层高最小的方向，一层薄一点换更多层数',
+    prefer: o => o.dz * 1000 + o.area },
+  { key:'highlayer',name:'高层优先', desc:'优先选层高最大的方向，层数少但每层堆得满',
+    prefer: o => -o.dz * 1000 + o.area },
+  { key:'tallflat', name:'窄长优先', desc:'优先选窄长占位，减少端头缝隙',
+    prefer: o => Math.max(o.dx, o.dy) * 100 + o.area },
+];
+
+/**
+ * 二次塞缝：主装箱结束后，把剩余空闲区再扫一遍。
+ *
+ * MaxRects 本身已经会持续利用空闲矩形，这一步针对的是"策略偏好导致留下的
+ * 细长缝"——换一个放置偏好再跑一遍，把这些缝里的箱子补上。
+ *
+ * 注意这里必须像 packLayer 一样**边放边切分空闲矩形**，不能只按最初的空闲矩形
+ * 各塞一个箱子：多个箱子会落在同一个原点上互相重叠（间隙越大缝越碎，越容易触发）。
+ */
+function secondPass(binL, binW, opts, items, limit) {
+  if (items.length >= limit) return [];
+
+  let free = freeRectsAfter(binL, binW, opts, items);
+  if (free.length === 0) return [];
+
+  const more = [];
+  while (more.length < limit - items.length && free.length > 0) {
+    // 优先把"塞得下的、浪费最少的"那一处填掉
+    let best = null;
+    for (const fr of free) {
+      for (const o of opts) {
+        if (o.dx > fr.w + EPS || o.dy > fr.h + EPS) continue;
+        const waste = fr.w * fr.h - o.area;
+        if (!best || waste < best.waste - EPS) best = { fr, o, waste };
+      }
+    }
+    if (!best) break;
+
+    const { fr, o } = best;
+    more.push({ x: fr.x, y: fr.y, di: o.index, dz: o.dz });
+
+    const box = { x: fr.x, y: fr.y, w: o.dx, h: o.dy };
+    const next = [];
+    for (const r of free) {
+      if (!rectsOverlap(r, box)) { next.push(r); continue; }
+      if (r.x + r.w > box.x + box.w + EPS) {
+        next.push({ x: box.x + box.w, y: r.y, w: r.x + r.w - (box.x + box.w), h: r.h });
+      }
+      if (r.y + r.h > box.y + box.h + EPS) {
+        next.push({ x: r.x, y: box.y + box.h, w: r.w, h: r.y + r.h - (box.y + box.h) });
+      }
+    }
+    free = pruneFreeRects(next);
+  }
+
+  return more;
+}
+
+/** 由"已放箱子的并集"反推剩余空闲矩形。 */
+function freeRectsAfter(binL, binW, opts, items) {
+  let free = [{ x: 0, y: 0, w: binL, h: binW }];
+  for (const it of items) {
+    const o = opts.find(x => x.index === it.di);
+    if (!o) continue;
+    const box = { x: it.x, y: it.y, w: o.dx, h: o.dy };
+    const next = [];
+    for (const r of free) {
+      if (!rectsOverlap(r, box)) { next.push(r); continue; }
+      if (r.x + r.w > box.x + box.w + EPS) {
+        next.push({ x: box.x + box.w, y: r.y, w: r.x + r.w - (box.x + box.w), h: r.h });
+      }
+      if (r.y + r.h > box.y + box.h + EPS) {
+        next.push({ x: r.x, y: box.y + box.h, w: r.w, h: r.y + r.h - (box.y + box.h) });
+      }
+    }
+    free = pruneFreeRects(next);
+    if (free.length === 0) break;
+  }
+  return free;
+}
+
+/** 按策略跑一次完整分层装柜。 */
+function packWithStrategy(opts, strategy, cap) {
+  const layers = [];
+  let usedH = 0, boxes = 0;
+  const maxLayers = state.maxLayer > 0 ? state.maxLayer : Infinity;
+
+  // 硬上限：柜内空间的物理容量。既是待装数量未指定时的收敛条件，
+  // 也是防死循环的兜底——宁可少装，也不能装出物理上不可能的数字。
+  const hardCap = Math.min(cap > 0 ? cap : Infinity, capacityUpperBound(opts));
+  if (!Number.isFinite(hardCap) || hardCap <= 0) return { layers, boxes, layerH: usedH };
+
+  while (layers.length < maxLayers && usedH < state.cH - EPS && boxes < hardCap) {
+    const remainH = state.cH - usedH;
+    // 本层只能放"层高不超过剩余柜高"的方向
+    const layerOpts = opts.filter(o => o.dz <= remainH + EPS);
+    if (layerOpts.length === 0) break;
+
+    const limit = hardCap - boxes;
+    let items = packLayer(state.cL, state.cW, layerOpts, strategy.prefer, limit);
+    if (items.length === 0) break;
+
+    if (state.useSecondPass && items.length < limit) {
+      const more = secondPass(state.cL, state.cW, layerOpts, items, limit);
+      if (more.length > 0) items = items.concat(more);
+    }
+
+    // 层高 = 本层最高的箱子。若因此超出柜顶，剔除放不下柜顶的箱子再取层高
+    let layerH = Math.max(...items.map(it => it.dz));
+    if (usedH + layerH > state.cH + EPS) {
+      items = items.filter(it => it.dz <= state.cH - usedH + EPS);
+      if (items.length === 0) break;
+      layerH = Math.max(...items.map(it => it.dz));
+    }
+
+    layers.push({ z: usedH, h: layerH, items, colorIdx: layers.length });
+    usedH += layerH;
+    boxes += items.length;
+  }
+
+  return { layers, boxes, layerH: usedH };
+}
+
+/** 单一方向基线：整齐网格排布。 */
+function packSingleOrientation(o, cap) {
+  const layers = [];
+  let usedH = 0, boxes = 0;
+  const maxLayers = state.maxLayer > 0 ? state.maxLayer : Infinity;
+  const perRowX = Math.floor((state.cL + state.gap) / o.dx);
+  const perRowY = Math.floor((state.cW + state.gap) / o.dy);
+  const perLayer = perRowX * perRowY;
+  const hardCap = cap > 0 ? cap : Infinity;
+
+  while (layers.length < maxLayers && usedH + o.dz <= state.cH + EPS && perLayer > 0 && boxes < hardCap) {
+    const n = Math.min(perLayer, hardCap - boxes);
+    if (n <= 0) break;
+
+    const items = [];
+    for (let iy = 0; iy < perRowY && items.length < n; iy++) {
+      for (let ix = 0; ix < perRowX && items.length < n; ix++) {
+        items.push({ x: ix * o.dx, y: iy * o.dy, di: o.index, dz: o.dz });
+      }
+    }
+    layers.push({ z: usedH, h: o.dz, items, colorIdx: layers.length });
+    usedH += o.dz;
+    boxes += items.length;
+  }
+  return { layers, boxes, layerH: usedH };
+}
+
+/* ───────── 统计 ───────── */
+function summarize(pack, strategy, singleBaseline) {
+  const boxVol = state.bL * state.bW * state.bH / 1e9;   // mm³ → CBM
+  const containerVol = state.cL * state.cW * state.cH / 1e9;
+  const usedVol = pack.boxes * boxVol;
+
+  const byDir = {};
+  for (const layer of pack.layers) {
+    for (const it of layer.items) byDir[it.di] = (byDir[it.di] || 0) + 1;
+  }
+
+  // 重心：按重量加权；单箱同重时与按箱数加权一致
+  const w = state.bWt > 0 ? state.bWt : 1;
+  let cx = 0, cy = 0, cz = 0, mass = 0;
+  for (const layer of pack.layers) {
+    for (const it of layer.items) {
+      const o = orientSize(dirDims(it.di));
+      cx += (it.x + o.dx / 2) * w;
+      cy += (it.y + o.dy / 2) * w;
+      cz += (layer.z + it.dz / 2) * w;
+      mass += w;
+    }
+  }
+  const cog = mass > 0 ? { x: cx / mass, y: cy / mass, z: cz / mass } : { x: 0, y: 0, z: 0 };
+
+  const layersInfo = pack.layers.map((l, i) => ({
+    index: i + 1, z: l.z, h: l.h, count: l.items.length,
+    volume: l.items.length * boxVol, weight: l.items.length * state.bWt,
+  }));
+
+  const util = containerVol > 0 ? usedVol / containerVol : 0;
+
+  return {
+    key: strategy.key,
+    name: strategy.name,
+    desc: strategy.desc,
+    layers: pack.layers,
+    layersInfo,
+    boxes: pack.boxes,
+    layerCount: pack.layers.length,
+    layerH: pack.layerH,
+    volume: usedVol,
+    containerVol,
+    util,
+    weight: pack.boxes * state.bWt,
+    byDir,
+    dirCount: Object.keys(byDir).length,
+    cog,
+    leftRatio: state.cL > 0 ? cog.x / state.cL : 0,
+    depthRatio: state.cW > 0 ? cog.y / state.cW : 0,
+    heightRatio: state.cH > 0 ? cog.z / state.cH : 0,
+    singleBaseline,
+    gainBoxes: singleBaseline ? pack.boxes - singleBaseline.boxes : 0,
+    gainUtil: singleBaseline ? (util - singleBaseline.util) * 100 : 0,
+  };
+}
+
+/** 跑全部策略，取 Top3（按箱数 → 利用率 → 层数排序，等价方案去重）。 */
+function solve() {
+  const opts = buildOpts();
+  if (opts.length === 0) return { error: '没有可用方向：纸箱尺寸超过柜内尺寸，或所选方向都没勾选。' };
+
+  const cap = state.qty > 0 ? state.qty : 0;
+
+  // 单一方向基线取"所有允许方向里最好的那个"，保证对比公平
+  // （只跟"正常堆放"比会刻意压低混合方案的收益）
+  let bestSingle = null;
+  for (const o of opts) {
+    const r = summarize(packSingleOrientation(o, cap),
+      { key: 'single', name: '单一方向 · ' + DIRS[o.index].name, desc: '所有箱子朝同一方向码放（' + o.key + '）' }, null);
+    if (!bestSingle || r.boxes > bestSingle.boxes || (r.boxes === bestSingle.boxes && r.util > bestSingle.util)) {
+      bestSingle = r;
+    }
+  }
+
+  const runs = STRATEGIES.map(st => summarize(packWithStrategy(opts, st, cap), st, bestSingle));
+  const pool = [...runs, bestSingle];
+
+  pool.sort((a, b) => (b.boxes - a.boxes) || (b.util - a.util) || (a.layerCount - b.layerCount));
+
+  const top = [];
+  for (const r of pool) {
+    // 箱数与层数都相同 → 布局等价，只留第一个（否则 Top3 卡片会显示同一个结果）
+    if (top.some(t => t.boxes === r.boxes && t.layerCount === r.layerCount)) continue;
+    top.push(r);
+    if (top.length === 3) break;
+  }
+  return { plans: top, single: bestSingle, opts };
+}
+
+/* ═══════════════════════════════════════════════════════
+   渲染
+   ═══════════════════════════════════════════════════════ */
+
+const $ = id => document.getElementById(id);
+const fmt = (n, d = 0) => Number(n).toLocaleString('zh-CN', { minimumFractionDigits: d, maximumFractionDigits: d });
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+function renderTypeButtons() {
+  const box = $('typeBtns');
+  box.innerHTML = '';
+  for (const [key, c] of Object.entries(CONTAINERS)) {
+    const b = document.createElement('button');
+    b.textContent = key;
+    b.className = state.ctype === key ? 'on' : '';
+    b.title = `${key} 内部 ${c.L}×${c.W}×${c.H} mm`;
+    b.onclick = () => {
+      state.ctype = key;
+      state.cL = c.L; state.cW = c.W; state.cH = c.H;
+      syncInputs(); renderTypeButtons(); renderDirList();
+    };
+    box.appendChild(b);
+  }
+}
+
+function renderDirList() {
+  const box = $('dirList');
+  box.innerHTML = '';
+  DIRS.forEach((meta, i) => {
+    const d = dirDims(i);
+    const fits = d[0] + state.gap <= state.cL && d[1] + state.gap <= state.cW && d[2] + state.gap <= state.cH;
+    const usable = state.allowRotate || meta.d[2] === 'H';
+
+    const note = !usable
+      ? '<span class="off"> · 需允许旋转</span>'
+      : fits ? '' : '<span class="bad"> · 放不进该柜</span>';
+
+    const row = document.createElement('label');
+    row.className = 'dir' + (state.dirs[i] && usable ? ' on' : '');
+    row.innerHTML =
+      `<input type="checkbox" ${state.dirs[i] ? 'checked' : ''} ${usable ? '' : 'disabled'}>` +
+      `<div><div class="dmain">${esc(meta.name)} <span style="font-weight:500;color:#667">${meta.key}</span></div>` +
+      `<div class="dsub">${meta.tip} · 占用 ${d[0]}×${d[1]}×${d[2]} mm${note}</div></div>`;
+    row.querySelector('input').onchange = e => { state.dirs[i] = e.target.checked; renderDirList(); };
+    box.appendChild(row);
+  });
+}
+
+function currentPlan() { return state.plans[state.active] || null; }
+
+function renderResults(res) {
+  const has = !res.error && res.plans && res.plans.length > 0;
+  ['resultTop','resultMain','resultCog','resultOri','resultView'].forEach(id => { $(id).style.display = has ? '' : 'none'; });
+  $('emptyBox').style.display = has ? 'none' : '';
+  $('btnPrint').disabled = !has;
+
+  if (!has) {
+    $('emptyBox').innerHTML = res.error
+      ? `<div class="warnbox">${esc(res.error)}</div>`
+      : '没有可用方案。';
+    return;
+  }
+
+  state.plans = res.plans;
+  if (state.active >= res.plans.length) state.active = 0;
+  renderPlans();
+  renderCurrent();
+}
+
+function renderPlans() {
+  const box = $('planList');
+  box.innerHTML = '';
+  state.plans.forEach((p, i) => {
+    const best = i === 0;
+    const card = document.createElement('div');
+    card.className = 'plan' + (best ? ' best' : '');
+    card.innerHTML =
+      `<div class="pname">${best ? '<span>最优方案</span>' : ''}${esc(p.name)}</div>` +
+      `<div class="pbig">${fmt(p.boxes)}<small>箱</small></div>` +
+      `<div class="pmeta">利用率 ${(p.util * 100).toFixed(1)}% · ${p.layerCount} 层 · ${fmt(p.volume, 2)} CBM</div>` +
+      `<div class="pmeta" style="color:#667">${esc(p.desc || '')}</div>`;
+    card.onclick = () => { state.active = i; state.layerIdx = 0; renderPlans(); renderCurrent(); };
+    box.appendChild(card);
+  });
+}
+
+function renderCurrent() {
+  const p = currentPlan();
+  if (!p) return;
+  $('planName').textContent = p.name;
+
+  if (p.singleBaseline) {
+    const g = p.gainBoxes, gu = p.gainUtil;
+    $('compareBar').innerHTML = (g === 0 && Math.abs(gu) < 0.05)
+      ? `当前方案与单一方向基线持平：<b>${fmt(p.boxes)}</b> 箱，利用率 <b>${(p.util * 100).toFixed(1)}%</b>。`
+      : `混合方向比单一方向多装 <b>${g > 0 ? '+' : ''}${fmt(g)}</b> 箱，利用率提升 <b>${gu > 0 ? '+' : ''}${gu.toFixed(1)}%</b>` +
+        `（单一方向基线 ${fmt(p.singleBaseline.boxes)} 箱 / ${(p.singleBaseline.util * 100).toFixed(1)}%）。`;
+  } else {
+    $('compareBar').innerHTML = `单一方向装载：<b>${fmt(p.boxes)}</b> 箱，利用率 <b>${(p.util * 100).toFixed(1)}%</b>。` +
+      `切到「混合方向」可看到多方向码放能多装多少。`;
+  }
+
+  const metrics = [
+    { v: fmt(p.boxes), k: '总装载箱数 (箱)', cls: 'good' },
+    { v: fmt(p.dirCount), k: '使用摆放方向数' },
+    { v: (p.util * 100).toFixed(1) + '%', k: '体积利用率' },
+    { v: fmt(p.volume, 2), k: '总体积 (CBM)' },
+    { v: fmt(p.weight, 1), k: '总重量 (kg)' },
+    { v: fmt(p.singleBaseline ? p.singleBaseline.boxes : p.boxes), k: '单一方向最多' },
+    { v: fmt(Math.max(0, p.containerVol - p.volume), 2), k: '剩余空间 (CBM)', cls: 'warn' },
+  ];
+  $('metricGrid').innerHTML = metrics.map(m =>
+    `<div class="metric ${m.cls || ''}"><div class="mv">${m.v}</div><div class="mk">${m.k}</div></div>`).join('');
+
+  const axes = [
+    { label: '— 柜面(后)', ratio: p.leftRatio,  ends: ['后端面','前端面'], fill: '#4a90d9' },
+    { label: '— 左侧',    ratio: p.depthRatio, ends: ['左侧','右侧'],    fill: '#5cb85c' },
+    { label: '— 底部',    ratio: p.heightRatio,ends: ['底部','顶部'],    fill: '#e8833a' },
+  ];
+  $('cogBox').innerHTML =
+    `<div style="font-size:12.5px"><span style="color:#667">重心坐标 (X×Y×Z)</span> ` +
+    `<b style="font-variant-numeric:tabular-nums">${fmt(p.cog.x)} × ${fmt(p.cog.y)} × ${fmt(p.cog.z)} mm</b></div>` +
+    axes.map(a => {
+      const r = Math.max(0, Math.min(1, a.ratio));
+      const l = (r * 100).toFixed(1), rr = ((1 - r) * 100).toFixed(1);
+      return `<div class="cog"><div class="axis"><div class="alab">${a.label}</div>` +
+        `<div class="abar"><div class="afill" style="width:${l}%;background:${a.fill}"></div>` +
+        `<div class="amark" style="left:calc(${l}% - 1px)"></div></div></div>` +
+        `<div class="aends"><span>${a.ends[0]} ${l}%</span><span>${a.ends[1]} ${rr}%</span></div></div>`;
+    }).join('') +
+    (Math.abs(p.leftRatio - 0.5) < 0.06 && Math.abs(p.heightRatio - 0.5) < 0.06
+      ? '<div style="margin-top:8px;font-size:12px;color:#0f7b3d">✓ 重心居中，装载均衡</div>' : '');
+
+  $('oriList').innerHTML = Object.entries(p.byDir).sort((a, b) => b[1] - a[1]).map(([di, n]) => {
+    const i = Number(di), meta = DIRS[i], d = dirDims(i);
+    return `<div class="odetail"><div class="odot" style="background:${DIR_COLORS[i % 8]}"></div>` +
+      `<div class="on">${esc(meta.name)} <span style="font-weight:500;color:#667">${meta.key}</span></div>` +
+      `<div class="os">占用 ${d[0]}×${d[1]}×${d[2]} mm</div>` +
+      `<div class="oc">${fmt(n)} 箱</div></div>`;
+  }).join('');
+
+  renderView();
+}
+
+/* ───────── 3D 视图 ───────── */
+function draw3d() {
+  const cv = $('c3d'), ctx = cv.getContext('2d');
+  const p = currentPlan();
+
+  const grad = ctx.createLinearGradient(0, 0, 0, cv.height);
+  grad.addColorStop(0, '#eef2f7'); grad.addColorStop(1, '#e2e8f0');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, cv.width, cv.height);
+
+  if (!p) { $('legend3d').innerHTML = ''; return; }
+
+  const cL = state.cL, cW = state.cW, cH = state.cH;
+  const cx = cL / 2, cy = cW / 2, cz = cH / 2;
+  const cy1 = Math.cos(state.yaw), sy1 = Math.sin(state.yaw);
+  const cp = Math.cos(state.pitch), sp = Math.sin(state.pitch);
+
+  // 投影：绕 Z 轴 yaw → 绕 X 轴 pitch；depth 用于背面剔除与画家算法排序
+  const project = (x, y, z) => {
+    const dx = x - cx, dy = y - cy, dz = z - cz;
+    const rx = dx * cy1 - dy * sy1;
+    const ry = dx * sy1 + dy * cy1;
+    return { sx: rx, sy: ry * cp - dz * sp, depth: ry * sp + dz * cp };
+  };
+
+  // 方向向量（面法线）只旋转、不平移。背面剔除必须用这个：project() 会先减去柜体中心，
+  // 单位法线代入后 depth 被 -cz*cp 主导（约 -500），六个面会全被判成背面，
+  // 结果是柜体线框画出来了、箱子一个都没有。
+  const projectDir = (x, y, z) => (x * sy1 + y * cy1) * sp + z * cp;
+
+  // 自适应缩放：用 8 个柜体角点算出投影包围盒
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const x of [0, cL]) for (const y of [0, cW]) for (const z of [0, cH]) {
+    const s = project(x, y, z);
+    minX = Math.min(minX, s.sx); maxX = Math.max(maxX, s.sx);
+    minY = Math.min(minY, s.sy); maxY = Math.max(maxY, s.sy);
+  }
+  const pad = 46;
+  const scale = Math.min((cv.width - pad * 2) / (maxX - minX || 1), (cv.height - pad * 2) / (maxY - minY || 1)) * state.zoom;
+  const offX = cv.width / 2 - ((minX + maxX) / 2) * scale;
+  const offY = cv.height / 2 - ((minY + maxY) / 2) * scale;
+  const P = (x, y, z) => { const s = project(x, y, z); return [s.sx * scale + offX, s.sy * scale + offY, s.depth]; };
+
+  // 柜体线框
+  ctx.strokeStyle = 'rgba(30,60,100,.55)'; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  const E = [[0,0,0],[cL,0,0],[cL,cW,0],[0,cW,0],[0,0,cH],[cL,0,cH],[cL,cW,cH],[0,cW,cH]];
+  for (const [a, b] of [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]]) {
+    const pa = P(...E[a]), pb = P(...E[b]);
+    ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]);
+  }
+  ctx.stroke();
+
+  // 箱子面：逐层上色 + 背面剔除 + 画家算法（远的先画）
+  const faces = [];
+  for (const layer of p.layers) {
+    const base = DIR_COLORS[layer.colorIdx % 8];
+    for (const it of layer.items) {
+      const o = orientSize(dirDims(it.di));
+      const x0 = it.x, y0 = it.y, z0 = layer.z;
+      const V = [
+        [x0,y0,z0], [x0+o.dx,y0,z0], [x0+o.dx,y0+o.dy,z0], [x0,y0+o.dy,z0],
+        [x0,y0,z0+o.dz], [x0+o.dx,y0,z0+o.dz], [x0+o.dx,y0+o.dy,z0+o.dz], [x0,y0+o.dy,z0+o.dz],
+      ];
+      const F = [
+        { idx:[4,5,6,7], n:[0,0,1],  k:1.06 },  // 顶（最亮）
+        { idx:[0,3,2,1], n:[0,0,-1], k:0.55 },  // 底
+        { idx:[0,1,5,4], n:[0,-1,0], k:0.92 },
+        { idx:[2,3,7,6], n:[0,1,0],  k:0.72 },
+        { idx:[1,2,6,5], n:[1,0,0],  k:0.84 },
+        { idx:[3,0,4,7], n:[-1,0,0], k:0.66 },
+      ];
+      for (const f of F) {
+        // 背面剔除：法线朝远点的反面不画
+        if (projectDir(f.n[0], f.n[1], f.n[2]) <= 0) continue;
+        const pts = f.idx.map(i => P(...V[i]));
+        faces.push({ pts, c: shade(base, f.k), depth: pts.reduce((s, q) => s + q[2], 0) / 4 });
+      }
+    }
+  }
+
+  faces.sort((a, b) => a.depth - b.depth);
+  ctx.lineWidth = 0.6;
+  for (const f of faces) {
+    ctx.beginPath();
+    ctx.moveTo(f.pts[0][0], f.pts[0][1]);
+    for (let i = 1; i < f.pts.length; i++) ctx.lineTo(f.pts[i][0], f.pts[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = f.c; ctx.fill();
+    ctx.strokeStyle = 'rgba(20,40,70,.28)'; ctx.stroke();
+  }
+
+  const shown = p.layers.slice(0, 8);
+  $('legend3d').innerHTML = shown.map(l =>
+    `<div class="lrow"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${DIR_COLORS[l.colorIdx % 8]}"></span>` +
+    `第 ${l.colorIdx + 1} 层 · ${l.items.length} 箱</div>`).join('') +
+    (p.layers.length > 8 ? `<div class="lrow" style="color:#667">…共 ${p.layers.length} 层</div>` : '');
+
+  $('viewExtra').textContent = `${state.ctype}（${cL}×${cW}×${cH}）· 已装 ${p.boxes} 箱 / ${fmt(p.layerH)} mm 高`;
+}
+
+function shade(hex, factor) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    .map(v => Math.max(0, Math.min(255, Math.round(v * factor))));
+  return `rgb(${ch[0]},${ch[1]},${ch[2]})`;
+}
+
+/* ───────── 分层俯视图 ───────── */
+function drawLayer() {
+  const cv = $('cLayer'), ctx = cv.getContext('2d');
+  const p = currentPlan();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#f4f6f9'; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (!p || p.layers.length === 0) return;
+
+  const layer = p.layers[Math.min(state.layerIdx, p.layers.length - 1)];
+  const pad = 40;
+  const scale = Math.min((cv.width - pad * 2) / state.cL, (cv.height - pad * 2) / state.cW);
+  const ox = (cv.width - state.cL * scale) / 2;
+  const oy = (cv.height - state.cW * scale) / 2;
+  const X = x => ox + x * scale, Y = y => oy + y * scale;
+
+  ctx.strokeStyle = '#dfe4ea'; ctx.lineWidth = 1;
+  ctx.strokeRect(X(0), Y(0), state.cL * scale, state.cW * scale);
+  const step = state.cL > 8000 ? 1000 : 500;
+  ctx.strokeStyle = '#eef1f5'; ctx.fillStyle = '#b0b8c4'; ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  for (let g = 0; g <= state.cL; g += step) {
+    ctx.beginPath(); ctx.moveTo(X(g), Y(0)); ctx.lineTo(X(g), Y(state.cW)); ctx.stroke();
+    ctx.fillText(String(g), X(g), oy - 6);
+  }
+  ctx.textAlign = 'right';
+  for (let g = 0; g <= state.cW; g += step) {
+    ctx.beginPath(); ctx.moveTo(X(0), Y(g)); ctx.lineTo(X(state.cL), Y(g)); ctx.stroke();
+    ctx.fillText(String(g), ox - 6, Y(g) + 3);
+  }
+
+  // 后画的盖住先画的：按 y 再 x 排序，与铺装顺序一致
+  ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const it of layer.items.slice().sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const o = orientSize(dirDims(it.di));
+    const w = o.dx * scale, h = o.dy * scale;
+    ctx.fillStyle = DIR_COLORS[it.di % 8] + 'cc';
+    ctx.fillRect(X(it.x), Y(it.y), w, h);
+    ctx.strokeStyle = 'rgba(20,40,70,.45)'; ctx.lineWidth = 0.8;
+    ctx.strokeRect(X(it.x), Y(it.y), w, h);
+    if (w > 34 && h > 20) {
+      ctx.fillStyle = '#fff';
+      ctx.fillText(DIRS[it.di].key, X(it.x) + w / 2, Y(it.y) + h / 2);
+    }
+  }
+
+  $('layerHint').textContent = `第 ${state.layerIdx + 1} 层 · 底面 ${fmt(layer.z)}–${fmt(layer.z + layer.h)} mm · ${layer.items.length} 箱`;
+}
+
+function renderView() {
+  const is3d = state.view === '3d';
+  $('view3d').style.display = is3d ? '' : 'none';
+  $('viewLayer').style.display = is3d ? 'none' : '';
+  if (is3d) { draw3d(); return; }
+
+  const p = currentPlan();
+  if (!p) return;
+  const bar = $('layerBar');
+  bar.innerHTML = '';
+  p.layers.forEach((l, i) => {
+    const b = document.createElement('button');
+    b.textContent = `第 ${i + 1} 层`;
+    b.className = i === state.layerIdx ? 'on' : '';
+    b.onclick = () => { state.layerIdx = i; renderView(); };
+    bar.appendChild(b);
+  });
+  const info = document.createElement('span');
+  info.className = 'linfo';
+  info.textContent = `${p.layerCount} 层 · 共 ${p.boxes} 箱`;
+  bar.appendChild(info);
+  drawLayer();
+}
+
+/* ═══════════════════════════════════════════════════════
+   打印报告
+   ═══════════════════════════════════════════════════════ */
+function buildReport() {
+  const p = currentPlan();
+  if (!p) return;
+
+  // 每层俯视图转 PNG 内嵌（打印时图片比 canvas 可靠）
+  const layerImgs = p.layers.map((l, i) => {
+    const cv = document.createElement('canvas');
+    cv.width = 720;
+    cv.height = Math.max(110, Math.round(720 * state.cW / state.cL));
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    const scale = Math.min((cv.width - 30) / state.cL, (cv.height - 30) / state.cW);
+    const ox = (cv.width - state.cL * scale) / 2, oy = (cv.height - state.cW * scale) / 2;
+    for (const it of l.items.slice().sort((a, b) => a.y - b.y || a.x - b.x)) {
+      const o = orientSize(dirDims(it.di));
+      ctx.fillStyle = DIR_COLORS[it.di % 8] + 'bb';
+      ctx.fillRect(ox + it.x * scale, oy + it.y * scale, o.dx * scale, o.dy * scale);
+      ctx.strokeStyle = '#445'; ctx.lineWidth = 0.7;
+      ctx.strokeRect(ox + it.x * scale, oy + it.y * scale, o.dx * scale, o.dy * scale);
+    }
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 1.6;
+    ctx.strokeRect(ox, oy, state.cL * scale, state.cW * scale);
+    ctx.fillStyle = '#111'; ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(`Layer ${i + 1} — ${l.items.length} cartons`, 8, 14);
+    return { data: cv.toDataURL('image/png'), layer: l, index: i + 1 };
+  });
+
+  const orientRows = Object.entries(p.byDir).sort((a, b) => b[1] - a[1]).map(([di, n]) => {
+    const i = Number(di), meta = DIRS[i], d = dirDims(i);
+    return `<tr><td>${esc(meta.name)}</td><td>${meta.key}</td><td>${d[0]}×${d[1]}×${d[2]}</td>` +
+      `<td>${n}</td><td>${((n / p.boxes) * 100).toFixed(1)}%</td></tr>`;
+  }).join('');
+
+  const layerRows = p.layersInfo.map(l =>
+    `<tr><td>${l.index}</td><td>${fmt(l.z)} – ${fmt(l.z + l.h)}</td><td>${l.count}</td>` +
+    `<td>${l.volume.toFixed(3)}</td><td>${fmt(l.weight, 1)}</td></tr>`).join('');
+
+  $('print-report').innerHTML =
+    `<div class="ptitle">装柜方案报告 · Loading Plan Report</div>` +
+    `<div class="pgrid">` +
+      block('集装箱 Container', `${state.ctype} · ${state.cL}×${state.cW}×${state.cH} mm`) +
+      block('纸箱 Carton', `${state.bL}×${state.bW}×${state.bH} mm · ${state.bWt} kg/箱`) +
+      block('装载结果 Result', `${fmt(p.boxes)} 箱 · ${p.layerCount} 层 · ${(p.util * 100).toFixed(1)}% 利用率`) +
+      block('重心 Center of Gravity', `${fmt(p.cog.x)} × ${fmt(p.cog.y)} × ${fmt(p.cog.z)} mm`) +
+      block('总体积 Volume', `${p.volume.toFixed(2)} / ${p.containerVol.toFixed(2)} CBM`) +
+      block('总重量 Weight', `${fmt(p.weight, 1)} kg`) +
+      block('使用方向数 Orientations', `${p.dirCount} 种`) +
+      block('预留间隙 Gap', `${state.gap} mm/边 · 堆码上限 ${state.maxLayer || '不限'}`) +
+    `</div>` +
+    `<div class="psec">各方向装箱明细 / Orientation Breakdown</div>` +
+    `<table class="ptable"><thead><tr><th>方向</th><th>占位</th><th>占用尺寸 (mm)</th><th>箱数</th><th>占比</th></tr></thead>` +
+    `<tbody>${orientRows}</tbody></table>` +
+    `<div class="psec">分层汇总 / Layer Summary</div>` +
+    `<table class="ptable"><thead><tr><th>层</th><th>高度区间 (mm)</th><th>箱数</th><th>体积 CBM</th><th>重量 kg</th></tr></thead>` +
+    `<tbody>${layerRows}</tbody></table>` +
+    `<div class="psec">分层俯视图（按此摆装） / Layer Layout</div>` +
+    layerImgs.map(x => `<div class="player"><div class="plc">第 ${x.index} 层 · ${x.layer.items.length} 箱 · ` +
+      `底面 ${fmt(x.layer.z)}–${fmt(x.layer.z + x.layer.h)} mm</div><img src="${x.data}"></div>`).join('') +
+    `<div class="pfoot"><span>装柜方案报告 · 生成于 ${new Date().toLocaleString('zh-CN')}</span>` +
+    `<span>本方案仅供参考，装柜前请复核柜型与承重限制</span></div>`;
+}
+
+function block(k, v) {
+  return `<div class="pblock"><div class="pk">${k}</div><div class="pv">${esc(v)}</div></div>`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   交互
+   ═══════════════════════════════════════════════════════ */
+
+function readInputs() {
+  state.cL = Math.max(1, +$('cL').value || state.cL);
+  state.cW = Math.max(1, +$('cW').value || state.cW);
+  state.cH = Math.max(1, +$('cH').value || state.cH);
+  state.bL = Math.max(1, +$('bL').value || state.bL);
+  state.bW = Math.max(1, +$('bW').value || state.bW);
+  state.bH = Math.max(1, +$('bH').value || state.bH);
+  state.bWt = Math.max(0, +$('bWt').value || 0);
+  state.maxLayer = Math.max(0, Math.floor(+$('maxLayer').value || 0));
+  state.gap = Math.max(0, +$('gap').value || 0);
+  state.qty = Math.max(0, Math.floor(+$('qty').value || 0));
+  state.allowRotate = $('allowRotate').checked;
+  state.useSecondPass = $('useSecondPass').checked;
+}
+
+function syncInputs() {
+  $('cL').value = state.cL; $('cW').value = state.cW; $('cH').value = state.cH;
+  $('bL').value = state.bL; $('bW').value = state.bW; $('bH').value = state.bH;
+  $('bWt').value = state.bWt; $('maxLayer').value = state.maxLayer;
+  $('gap').value = state.gap; $('qty').value = state.qty;
+  $('allowRotate').checked = state.allowRotate;
+  $('useSecondPass').checked = state.useSecondPass;
+}
+
+/**
+ * 从 URL hash 预填（dsh-lc-parser 插件带箱规调用时走这条）。
+ * 例：container-loader.html#len=600&wid=400&hei=350&wt=15&qty=1360&type=40HQ
+ */
+function applyHash() {
+  const h = location.hash.replace(/^#/, '');
+  if (!h) return false;
+  const params = new URLSearchParams(h);
+  const num = k => { const v = params.get(k); return v && !Number.isNaN(+v) && +v > 0 ? +v : null; };
+
+  for (const [k, field] of [['len','bL'], ['wid','bW'], ['hei','bH'], ['wt','bWt'], ['qty','qty']]) {
+    const v = num(k);
+    if (v !== null) state[field] = v;
+  }
+
+  const t = (params.get('type') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const hit = Object.keys(CONTAINERS).find(key => t.includes(key.replace('GP', '')) || t.includes(key));
+  if (hit) {
+    state.ctype = hit;
+    state.cL = CONTAINERS[hit].L; state.cW = CONTAINERS[hit].W; state.cH = CONTAINERS[hit].H;
+  }
+
+  // 有总体积但没件数时，按单箱体积反推件数
+  const cbm = num('cbm');
+  if (cbm !== null && !params.get('qty')) {
+    const perCbm = state.bL * state.bW * state.bH / 1e6;
+    if (perCbm > 0) state.qty = Math.max(1, Math.round(cbm / perCbm));
+  }
+  return true;
+}
+
+function calculate() {
+  readInputs();
+  renderDirList();
+
+  if (state.mode === 'single') {
+    const opts = buildOpts();
+    if (opts.length === 0) {
+      renderResults({ error: '没有可用方向：纸箱尺寸超过柜内尺寸，或所选方向都没勾选。' });
+      return;
+    }
+    const cap = state.qty > 0 ? state.qty : 0;
+    let best = null;
+    for (const o of opts) {
+      const r = summarize(packSingleOrientation(o, cap),
+        { key: 'single', name: '单一方向 · ' + DIRS[o.index].name, desc: '所有箱子朝同一方向码放（' + o.key + '）' }, null);
+      if (!best || r.boxes > best.boxes || (r.boxes === best.boxes && r.util > best.util)) best = r;
+    }
+    state.active = 0;
+    renderResults({ plans: [best] });
+    return;
+  }
+  renderResults(solve());
+}
+
+function init3dDrag() {
+  const cv = $('c3d');
+  cv.addEventListener('pointerdown', e => {
+    state.drag = { x: e.clientX, y: e.clientY };
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!state.drag) return;
+    state.yaw += (e.clientX - state.drag.x) * 0.012;
+    state.pitch = Math.max(-1.45, Math.min(1.45, state.pitch + (e.clientY - state.drag.y) * 0.010));
+    state.drag = { x: e.clientX, y: e.clientY };
+    if (state.view === '3d') draw3d();
+  });
+  const stop = () => { state.drag = null; };
+  cv.addEventListener('pointerup', stop);
+  cv.addEventListener('pointercancel', stop);
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    state.zoom = Math.max(0.35, Math.min(3, state.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+    if (state.view === '3d') draw3d();
+  }, { passive: false });
+}
+
+function boot() {
+  renderTypeButtons();
+  applyHash();
+  syncInputs();
+  renderDirList();
+
+  document.querySelectorAll('#modeSeg button').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('#modeSeg button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      state.mode = b.dataset.mode;
+      $('modeNote').textContent = state.mode === 'single'
+        ? '所有箱子朝同一方向码放，作为混合方案的对比基线。'
+        : '遍历 6 种摆放方向，多策略寻优 + 二次塞缝，把端头缝隙与剩余空间尽量补满。';
+      calculate();
+    };
+  });
+
+  ['bL','bW','bH','cL','cW','cH','gap'].forEach(id => {
+    $(id).addEventListener('input', () => { readInputs(); renderDirList(); });
+  });
+
+  $('dirAll').onclick = () => { state.dirs = DIRS.map(() => true); renderDirList(); };
+  $('dirNone').onclick = () => { state.dirs = DIRS.map(() => false); renderDirList(); };
+  $('btnCalc').onclick = calculate;
+  $('btnPrint').onclick = () => { buildReport(); window.print(); };
+
+  document.querySelectorAll('.viewtabs button').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.viewtabs button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      state.view = b.dataset.view;
+      renderView();
+    };
+  });
+
+  init3dDrag();
+  calculate();
+}
+
+boot();
+
+/* 对外暴露：供插件或自动化测试调用 */
+window.ContainerLoader = {
+  state,
+  solve,
+  set(cfg) {
+    Object.assign(state, cfg);
+    syncInputs(); renderTypeButtons(); renderDirList(); calculate();
+    return currentPlan();
+  },
+};
+</script>
+</body>
+</html>

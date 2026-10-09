@@ -1,0 +1,13 @@
+{
+  "name": "boxfill",
+  "version": "1.0.0",
+  "description": "装柜数量计算器 —— 集装箱装载方案测算（单文件零依赖）",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
