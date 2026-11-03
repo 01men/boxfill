@@ -1,0 +1,29 @@
+# boxfill Worker 部署配置
+#
+# 为什么用 Worker 静态资产而不是隧道（与工作区里 lc / hermes 的做法不同）：
+# 工作区 §9 记录了隧道公网侧「2.9~11.5s、超时率约 50%」。那是给自用面板用的，
+# 凑合能接受。但这个工具的使用者是站在仓库里的操作员——网络本来就差，
+# 让他对着一个半死不活的页面等 10 秒，比让他多拍一张照片糟糕得多。
+# Worker 部署在 Cloudflare 边缘，你的 Mac 关了照样能用。
+#
+# 部署：npm run deploy（见 package.json）
+
+name = "boxfill"
+main = "worker.js"
+compatibility_date = "2026-10-09"
+
+# 不暴露 workers.dev 地址：外部访问只有 boxfill.ybkkasi.com 这一个入口，
+# 少一个入口就少一处需要单独加固的地方（工作区 §7.3 的安全提醒）。
+workers_dev = false
+
+# routes 必须写在所有 [段名] 之前。一旦进入 [assets] 表，后面的键就都归 assets 管，
+# wrangler 会静默忽略它并输出 "No targets deployed"——部署看起来成功了，域名却是空的。
+routes = [
+  { pattern = "boxfill.ybkkasi.com", custom_domain = true },
+]
+
+[assets]
+directory = "./h5"
+binding = "ASSETS"
+# 只有首页（介绍页）与工具入口进 Worker，其余静态资源直接由边缘直出，不耗 Worker 调用
+run_worker_first = ["/", "/index.html", "/app.html"]

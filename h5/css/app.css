@@ -1,0 +1,315 @@
+/* ═══════════════════════════════════════════════════════════════════
+   智能装箱 H5 样式
+
+   使用场景决定了这套样式的取舍：
+   · 手机在仓库里单手操作 → 按钮最小 44px，底部导航固定拇指可达
+   · 仓库光线差、有时戴手套 → 正文字号偏大，对比度拉高，不用浅灰细字
+   · 现场操作员不用电脑 → 界面只有四个大入口，没有二级菜单
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --brand: #0e6b52;
+  --brand2: #12876a;
+  --brandSoft: #e7f4f0;
+  --ink: #101828;
+  --muted: #55647a;
+  --faint: #8a97a8;
+  --line: #dde3ea;
+  --bg: #f2f5f8;
+  --card: #fff;
+  --red: #c0392b;
+  --redSoft: #fdecea;
+  --amber: #a8620a;
+  --amberSoft: #fdf3e3;
+  --green: #0f7b3d;
+  --greenSoft: #e8f6ec;
+  --blue: #1f4e8c;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+/* hidden 属性必须真的隐藏。
+   下面 .modal / .pick / .layerbar 都显式给了 display，而 [hidden] 的 UA 规则
+   display:none 与它们的优先级相同、写在更早的位置——结果就是 element.hidden = true
+   完全不起作用，弹层关不掉还一直盖在页面上。 */
+[hidden] { display: none !important; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.6;
+  padding-bottom: calc(62px + var(--safe-b));
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ── 顶栏 ── */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--brand); color: #fff;
+  padding: 10px 14px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+}
+.topbar .brand { display: flex; align-items: center; gap: 8px; }
+.topbar b { font-size: 17px; letter-spacing: .5px; }
+.topbar .spacer { flex: 1; }
+.net {
+  font-size: 11.5px; background: rgba(255, 255, 255, .18);
+  padding: 2px 8px; border-radius: 20px;
+}
+.net.off { background: #e0a106; color: #3a2400; font-weight: 700; }
+.tbtn {
+  background: rgba(255, 255, 255, .16); border: none; color: #fff;
+  width: 34px; height: 34px; border-radius: 8px; font-size: 17px; cursor: pointer;
+}
+
+/* ── 屏幕切换 ── */
+.screen { display: none; padding: 12px 12px 20px; }
+.screen.on { display: block; }
+
+/* ── 卡片 ── */
+.card {
+  background: var(--card); border-radius: 12px; padding: 13px;
+  margin-bottom: 12px; box-shadow: 0 1px 3px rgba(16, 24, 40, .06);
+}
+.sec {
+  font-size: 14px; font-weight: 700; color: var(--brand);
+  margin-bottom: 9px; padding-left: 9px; border-left: 4px solid var(--brand2);
+  display: flex; align-items: baseline; gap: 7px;
+}
+.sec .hint { font-size: 11.5px; font-weight: 400; color: var(--faint); }
+
+/* ── 表单 ── */
+.field { margin-bottom: 9px; }
+.field > label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+.field small { display: block; font-size: 11px; color: var(--faint); margin-top: 3px; }
+.field.inline { display: flex; align-items: center; gap: 7px; }
+.field.inline > label { margin: 0; font-size: 13.5px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.inline { display: flex; gap: 6px; align-items: center; }
+.inline > input { flex: 1; }
+
+input[type=text], input[type=number], select {
+  width: 100%; padding: 9px 10px; font-size: 15px;
+  border: 1px solid #c9d2dc; border-radius: 8px; background: #fff; color: var(--ink);
+  outline: none; min-height: 42px;
+}
+input:focus, select:focus { border-color: var(--brand2); box-shadow: 0 0 0 3px var(--brandSoft); }
+/* 复选框永远不该参与伸缩：.inline > input { flex:1 } 是给"输入框 + 按钮"那类行用的，
+   而 .field.inline 同时命中它，不锁死的话复选框会被拉成整行宽度、标签被顶到最右。 */
+input[type=checkbox] { width: 20px; height: 20px; flex: none; margin: 0; }
+
+/* ── 按钮 ── */
+.btn {
+  width: 100%; padding: 11px; font-size: 15px; font-weight: 600;
+  border-radius: 9px; border: 1px solid var(--brand); background: var(--brand); color: #fff;
+  cursor: pointer; min-height: 44px;
+}
+.btn:active { transform: translateY(1px); }
+.btn.ghost { background: #fff; color: var(--brand); }
+.btn.sm { padding: 7px 12px; font-size: 13.5px; min-height: 38px; width: auto; }
+.btn.big { font-size: 17px; padding: 14px; }
+.btn.danger { background: #fff; color: var(--red); border-color: var(--red); }
+.btn[disabled] { opacity: .45; }
+.row-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.row-actions .btn { flex: 1; min-width: 110px; }
+
+.seg, .tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; }
+.seg button, .tabs button {
+  flex: 1; padding: 9px 12px; font-size: 14px; white-space: nowrap;
+  border: 1px solid #c9d2dc; background: #fff; color: var(--muted);
+  border-radius: 8px; cursor: pointer; min-height: 40px;
+}
+.seg button.on, .tabs button.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+
+/* ── 测：取景台 ── */
+.stage {
+  position: relative; background: #10161c; border-radius: 12px;
+  overflow: hidden; aspect-ratio: 3 / 4; margin-bottom: 12px;
+}
+.stage video, .stage canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.stage video { display: none; }
+.stage.live video { display: block; }
+.stage canvas { pointer-events: none; }
+/* 取景引导框只在摄像头开启后出现：没开摄像头时它会压在说明文字上，
+   屏幕上同时出现两套"把东西放这里"的指令，用户不知道听谁的 */
+.guides { position: absolute; inset: 0; display: none; }
+.stage.live .guides { display: block; }
+.guide {
+  position: absolute; border: 2px dashed rgba(255, 255, 255, .5);
+  border-radius: 8px; display: flex; align-items: flex-start; justify-content: center;
+}
+.guide span {
+  background: rgba(0, 0, 0, .5); color: #fff; font-size: 11.5px;
+  padding: 2px 8px; border-radius: 0 0 8px 0;
+}
+.g-box { left: 6%; top: 8%; width: 88%; height: 56%; }
+.g-scale { left: 20%; top: 70%; width: 60%; height: 22%; border-color: rgba(255, 210, 100, .7); }
+.stage-empty {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  color: #d8dee6; text-align: center; padding: 20px; font-size: 13.5px;
+}
+.stage-empty .big { font-size: 40px; }
+.stage-empty .btn { width: auto; padding: 10px 22px; }
+/* 确认制测量的快门条：标定 + 确认测量。识别永远只 suggestion，用户按了才算数 */
+.shotbar {
+  position: absolute; left: 0; right: 0; bottom: 44px;
+  display: flex; justify-content: center; gap: 10px;
+}
+.shotbar .btn.big { padding: 12px 30px; font-size: 16px; }
+.shotbar .btn:disabled { opacity: .45; }
+.light {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 9px 14px;
+  font-size: 14px; font-weight: 700; text-align: center;
+}
+.light.ok { background: var(--green); color: #fff; }
+.light.no { background: var(--red); color: #fff; }
+.light.idle { background: rgba(0, 0, 0, .55); color: #cfd8e3; }
+
+/* ── 三行摘要 ── */
+.big3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.b3 { text-align: center; padding: 8px 4px; background: var(--brandSoft); border-radius: 9px; }
+.b3 .v { font-size: 19px; font-weight: 800; color: var(--brand); word-break: break-all; line-height: 1.25; }
+.b3 .k { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.summary { background: linear-gradient(135deg, #0b5a4a, #12876a); color: #fff; }
+.sumline { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; }
+.sumline b { font-size: 27px; font-weight: 800; letter-spacing: -.5px; min-width: 92px; }
+.sumline span { font-size: 13px; opacity: .9; }
+.sumsub { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(255, 255, 255, .25); font-size: 12.5px; opacity: .92; }
+
+/* ── 列表 ── */
+.pick { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.pick .item {
+  display: flex; align-items: center; gap: 9px; padding: 9px 11px;
+  border: 1px solid var(--line); border-radius: 9px; cursor: pointer; background: #fff;
+}
+.pick .item.on { border-color: var(--brand2); background: var(--brandSoft); }
+.pick .item .t { flex: 1; min-width: 0; }
+.pick .item .t b { display: block; font-size: 14px; }
+.pick .item .t span { font-size: 11.5px; color: var(--muted); }
+
+.kv { display: flex; flex-direction: column; gap: 7px; }
+.kv .row-i {
+  display: flex; align-items: center; gap: 9px; padding: 9px 11px;
+  border: 1px solid var(--line); border-radius: 9px; background: #fff;
+}
+.kv .row-i .t { flex: 1; min-width: 0; }
+.kv .row-i .t b { font-size: 14px; display: block; }
+.kv .row-i .t span { font-size: 11.5px; color: var(--muted); }
+.kv .x { color: var(--red); font-size: 13px; padding: 6px; }
+
+.dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+.issues { margin-top: 9px; display: flex; flex-direction: column; gap: 6px; }
+.issue { font-size: 12.5px; padding: 8px 10px; border-radius: 8px; }
+.issue.error { background: var(--redSoft); color: #8f2318; border-left: 4px solid var(--red); }
+.issue.warn { background: var(--amberSoft); color: #7a4708; border-left: 4px solid #d68b12; }
+.issue.info { background: #eef4fb; color: #1a4a80; border-left: 4px solid var(--blue); }
+.issue.ok { background: var(--greenSoft); color: #0b5c2f; border-left: 4px solid var(--green); }
+
+/* ── 视图 ── */
+.viewbox { position: relative; background: #eef2f6; border-radius: 10px; overflow: hidden; }
+.viewbox canvas { display: block; width: 100%; height: auto; }
+.legend {
+  position: absolute; left: 8px; top: 8px; background: rgba(255, 255, 255, .93);
+  border-radius: 8px; padding: 7px 9px; font-size: 11.5px; max-height: 46%; overflow: auto;
+}
+.legend div { display: flex; align-items: center; gap: 5px; }
+.layerbar { display: flex; gap: 5px; overflow-x: auto; margin-top: 8px; }
+.layerbar button {
+  padding: 6px 11px; font-size: 13px; border: 1px solid #c9d2dc; background: #fff;
+  border-radius: 7px; white-space: nowrap; cursor: pointer;
+}
+.layerbar button.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+
+/* ── 表格 ── */
+table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.t th, table.t td { border: 1px solid var(--line); padding: 6px 7px; text-align: left; }
+table.t th { background: #eef2f6; font-weight: 700; }
+table.t td.num, table.t th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── 单据按钮 ── */
+.doclist { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.doc {
+  text-align: left; padding: 11px; border: 1px solid var(--line); border-radius: 10px;
+  background: #fff; cursor: pointer; min-height: 62px;
+}
+.doc b { display: block; font-size: 14.5px; color: var(--brand); }
+.doc span { font-size: 11px; color: var(--muted); }
+.doc:active { background: var(--brandSoft); }
+.docplan { font-size: 13px; color: var(--muted); }
+.docplan b { color: var(--ink); }
+
+/* ── 底部导航 ── */
+.tabs-bottom {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: #fff; border-top: 1px solid var(--line);
+  padding-bottom: var(--safe-b);
+}
+.tabs-bottom button {
+  background: none; border: none; padding: 7px 0 6px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; color: var(--faint);
+}
+.tabs-bottom button b { font-size: 19px; line-height: 1.15; }
+.tabs-bottom button span { font-size: 10.5px; }
+.tabs-bottom button.on { color: var(--brand); }
+/* 实验功能（摄像头识别）：视觉上就比主流程低一档，
+   免得用户第一次打开就把成败押在受环境影响的自动识别上 */
+.tabs-bottom button.tab-exp { color: var(--muted); opacity: .8; }
+.tabs-bottom button.tab-exp.on { color: #a8641a; opacity: 1; }
+.exp-banner {
+  margin-bottom: 12px; padding: 10px 12px; border-radius: 10px;
+  background: #fff6e6; border: 1px solid #f0d9ae;
+  color: #7a4708; font-size: 12.5px; line-height: 1.65;
+}
+.exp-banner b { font-weight: 700; }
+.exp-banner > b:first-child {
+  display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 20px;
+  background: #c9751a; color: #fff; font-size: 11.5px;
+}
+
+/* ── 弹层 ── */
+.modal { position: fixed; inset: 0; z-index: 50; background: rgba(8, 14, 22, .55); display: flex; align-items: flex-end; }
+.sheet {
+  background: #fff; width: 100%; max-height: 88vh; border-radius: 16px 16px 0 0;
+  display: flex; flex-direction: column;
+}
+.sheet-head {
+  display: flex; align-items: center; padding: 13px 15px; border-bottom: 1px solid var(--line);
+}
+.sheet-head b { flex: 1; font-size: 16px; }
+.sheet-head .tbtn { background: #eef2f6; color: var(--muted); }
+.sheet-body { padding: 14px 15px; overflow: auto; -webkit-overflow-scrolling: touch; }
+.sheet-foot { padding: 10px 15px calc(14px + var(--safe-b)); border-top: 1px solid var(--line); display: flex; gap: 8px; }
+.sheet-foot .btn { flex: 1; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  background: rgba(16, 24, 40, .93); color: #fff; padding: 10px 16px;
+  border-radius: 22px; font-size: 13.5px; z-index: 60; max-width: 88vw; text-align: center;
+}
+
+.tips { padding-left: 18px; font-size: 12.5px; color: var(--muted); }
+.tips li { margin: 3px 0; }
+
+/* ── 打印：屏幕隐藏，打印时铺满 A4 ── */
+.print-only { display: none; }
+@media print {
+  body { background: #fff; padding: 0; }
+  .topbar, .tabs-bottom, .screen, .toast, .modal { display: none !important; }
+  .print-only { display: block; }
+  @page { size: A4 landscape; margin: 10mm; }
+}
+
+@media (min-width: 720px) {
+  .screen { max-width: 720px; margin: 0 auto; }
+  .doclist { grid-template-columns: repeat(3, 1fr); }
+}

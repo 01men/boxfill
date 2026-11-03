@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0e6b52">
+<title>物流箱体测算工具</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ══════════ 顶栏 ══════════ -->
+<header class="topbar">
+  <div class="brand">
+    <b>物流箱体测算</b>
+    <span id="netState" class="net" title="离线状态">离线可用</span>
+  </div>
+  <div class="spacer"></div>
+  <button class="tbtn" id="btnShop" title="店铺与设置">⚙</button>
+</header>
+
+<main id="screens">
+
+<!-- ══════════════════════════════════════════════════════════
+     画面「测」（实验功能）：摄像头自动采集
+     识别依赖受控工位与光线，受环境影响较大；主流程是「算 → 单 → 数」，
+     所以它排在导航最后并标注实验。采不准可直接用下方手工补录兜底。
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen" id="s-measure">
+  <div class="exp-banner">
+    <b>实验功能</b>
+    摄像头测量依赖光线与工位摆放，受环境影响较大。识别不准时可直接用下方
+    <b>手工补录</b>，或去「数 → SKU」建档——两条路的结果完全等价。
+  </div>
+  <div class="stage" id="stage">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div class="guides">
+      <div class="guide g-box"><span>纸箱放这里</span></div>
+      <div class="guide g-scale"><span>秤屏放这里</span></div>
+    </div>
+    <div class="stage-empty" id="stageEmpty">
+      <p class="big">📷</p>
+      <p>把手机<b>垂直向下</b> 40–70cm，<br>让纸箱和电子秤屏幕同时进画面</p>
+      <button class="btn primary" id="btnCam">打开摄像头</button>
+      <button class="btn ghost" id="btnCloud">拍照识别（云端·实验）</button>
+      <button class="btn ghost" id="btnManual">手工补录</button>
+      <input type="file" id="cloudFile" accept="image/*" capture="environment" hidden>
+    </div>
+    <!-- 确认制测量：摄像头开着就持续检测箱体边缘，用户点「确认测量」才算数 -->
+    <div class="shotbar" id="shotBar" hidden>
+      <button class="btn ghost" id="btnCal">标定</button>
+      <button class="btn primary big" id="btnShot">确认测量</button>
+    </div>
+    <div class="light" id="light"><span id="lightText">未开始</span></div>
+  </div>
+
+  <!-- 采集结果：三行以内，用户核对后自己点「入库」（PRD 3） -->
+  <div class="card result" id="measureResult" hidden>
+    <div class="big3">
+      <div class="b3"><div class="v" id="rDims">—</div><div class="k">外箱尺寸 (cm)</div></div>
+      <div class="b3"><div class="v" id="rWeight">—</div><div class="k">单箱毛重 (kg)</div></div>
+      <div class="b3"><div class="v" id="rSku">—</div><div class="k">SKU</div></div>
+    </div>
+    <div class="row-actions">
+      <button class="btn ghost" id="btnRetake">重拍</button>
+      <button class="btn primary" id="btnSaveSku">入库</button>
+    </div>
+    <div class="issues" id="mIssues"></div>
+  </div>
+
+  <!-- 采集设置：只在「首次 / 异常」时展开，平时折叠 -->
+  <details class="card" id="mSetup">
+    <summary>工位设置（标定板 / 秤 / 皮重）</summary>
+    <div class="field">
+      <label>标定参照物</label>
+      <select id="refType">
+        <option value="a4-long">A4 纸长边 29.7cm</option>
+        <option value="a4-short">A4 纸短边 21.0cm</option>
+        <option value="grid10">10cm 棋盘格（一个格）</option>
+        <option value="custom">自定义…</option>
+      </select>
+      <input type="number" id="refCustom" step="0.1" placeholder="自定义参照长度 cm" hidden>
+    </div>
+    <div class="field">
+      <label>秤读数单位</label>
+      <select id="scaleUnit"><option value="kg">kg</option><option value="lb">lb</option><option value="g">g</option></select>
+    </div>
+    <div class="field">
+      <label>皮重 (kg)</label>
+      <input type="number" id="tareKg" step="0.01" value="0">
+      <small>放了托盘/垫板时先称皮重，这里填上，程序自动扣除</small>
+    </div>
+    <div class="field">
+      <label>当前 SKU（可扫码）</label>
+      <div class="inline">
+        <input type="text" id="scanCode" placeholder="扫码或输入货号" inputmode="text">
+        <button class="btn ghost sm" id="btnMatch">识别</button>
+      </div>
+    </div>
+  </details>
+
+  <!-- 手工补录：摄像头不可用时的兜底路径（PRD 11 权限兜底） -->
+  <div class="card" id="manualBox" hidden>
+    <div class="sec">手工补录</div>
+    <div class="grid3">
+      <div class="field"><label>货号</label><input type="text" id="mCode"></div>
+      <div class="field"><label>长 cm</label><input type="number" id="mL" step="0.1"></div>
+      <div class="field"><label>宽 cm</label><input type="number" id="mW" step="0.1"></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>高 cm</label><input type="number" id="mH" step="0.1"></div>
+      <div class="field"><label>毛重 kg</label><input type="number" id="mWt" step="0.01"></div>
+      <div class="field"><label>品名</label><input type="text" id="mName"></div>
+    </div>
+    <button class="btn primary" id="btnManualSave">存入主数据</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     画面「算」（主流程 1/3）：几个柜 / 多少钱 / 还能塞什么
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen on" id="s-calc">
+  <div class="card">
+    <div class="sec">① 选货<span class="hint">从订单选，或直接填箱数</span> <b id="pendingTotal" style="color:#0e6b52"></b></div>
+    <div class="seg" id="calcSource">
+      <button data-src="orders" class="on">按订单</button>
+      <button data-src="sku">按 SKU</button>
+    </div>
+    <div id="orderPick" class="pick"></div>
+    <div id="skuPick" class="pick" hidden></div>
+    <div class="row-actions">
+      <button class="btn ghost sm" id="btnAddLine">+ 手工加一行</button>
+      <button class="btn ghost sm" id="btnClearLines">清空待装</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec">② 柜型与限制</div>
+    <div class="grid3">
+      <div class="field"><label>柜型</label>
+        <select id="cBoxType">
+          <option value="AUTO">自动比选</option>
+          <option value="20GP">20GP</option><option value="40GP">40GP</option>
+          <option value="40HQ">40HQ</option><option value="45HQ">45HQ</option>
+          <option value="20OT">20OT</option><option value="40OT">40OT</option>
+          <option value="20FR">20FR</option><option value="40FR">40FR</option>
+        </select>
+      </div>
+      <div class="field"><label>航线限重 kg</label><input type="number" id="cLane" placeholder="选填"></div>
+      <div class="field"><label>拖车限重 kg</label><input type="number" id="cTruck" placeholder="选填"></div>
+    </div>
+    <div class="field inline">
+      <input type="checkbox" id="cPallet"><label for="cPallet">使用托盘（1.2×1.0m，叠 2 层）</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec">③ 运费参数</div>
+    <div class="grid3">
+      <div class="field"><label>每 CBM ¥</label><input type="number" id="cPerCbm" step="1" value="0"></div>
+      <div class="field"><label>每吨 ¥</label><input type="number" id="cPerTon" step="1" value="0"></div>
+      <div class="field"><label>单柜固定 ¥</label><input type="number" id="cPerBox" step="1" value="0"></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>THC ¥/柜</label><input type="number" id="cThc" step="1" value="0"></div>
+      <div class="field"><label>DOC ¥/柜</label><input type="number" id="cDoc" step="1" value="0"></div>
+      <div class="field"><label>BAF ¥/柜</label><input type="number" id="cBaf" step="1" value="0"></div>
+    </div>
+    <small>填 0 就只出装载方案不出钱。真实费率填进来才能比渠道、比箱型。</small>
+  </div>
+
+  <button class="btn primary big" id="btnCalc">开始测算</button>
+
+  <!-- 结果：三行摘要 + 3D 图 + 明细 -->
+  <div id="calcOut" hidden>
+    <div class="card summary" id="sumCard">
+      <div class="sumline"><b id="sContainers">—</b><span>几个柜</span></div>
+      <div class="sumline"><b id="sMoney">—</b><span>多少钱</span></div>
+      <div class="sumline"><b id="sMore">—</b><span>还能塞什么</span></div>
+      <div class="sumsub" id="sSub"></div>
+    </div>
+
+    <div class="card" id="violCard" hidden>
+      <div class="sec">需要注意</div>
+      <div id="violList"></div>
+    </div>
+
+    <div class="card">
+      <div class="sec">3D 装柜图<span class="hint">拖拽旋转 · 可打印贴柜门</span></div>
+      <div class="tabs" id="viewTabs">
+        <button data-view="3d" class="on">轴测图</button>
+        <button data-view="layer">分层俯视</button>
+        <button data-view="side">门端侧视</button>
+        <button data-view="balance">配重剖面</button>
+      </div>
+      <div class="viewbox">
+        <canvas id="cv3d" width="900" height="470"></canvas>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="layerbar" id="layerBar" hidden></div>
+      <div class="row-actions">
+        <button class="btn ghost sm" id="btnPng">导出 PNG</button>
+        <button class="btn ghost sm" id="btnGoDocs">生成单据 →</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec">剩余空间与补货建议</div>
+      <div id="remainBox"></div>
+    </div>
+
+    <div class="card" id="spillCard" hidden>
+      <div class="sec">装不下的部分（甩单）</div>
+      <div id="spillBox"></div>
+    </div>
+
+    <div class="card" id="cmpCard" hidden>
+      <div class="sec">箱型比选<span class="hint">按每 CBM 单价排序</span></div>
+      <div id="cmpBox"></div>
+    </div>
+
+    <div class="card" id="chanCard" hidden>
+      <div class="sec">渠道比价<span class="hint">全抛 / 半抛 / 免抛</span></div>
+      <div id="chanBox"></div>
+    </div>
+
+    <div class="card" id="cartonCard" hidden>
+      <div class="sec">纸箱优化建议<span class="hint">改小箱子能省运费</span></div>
+      <div id="cartonBox"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     画面「单」（主流程 2/3）：一键发给货代
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen" id="s-docs">
+  <div class="card">
+    <div class="sec">当前方案</div>
+    <div id="docPlan" class="docplan">还没有方案，先去「算」跑一次。</div>
+  </div>
+  <div class="card">
+    <div class="sec">单据<span class="hint">点一下直接发微信给货代</span></div>
+    <div class="doclist" id="docList">
+      <button class="doc" data-doc="packing"><b>装箱单</b><span>Packing List · 可直接报关</span></button>
+      <button class="doc" data-doc="loading"><b>装柜清单</b><span>Loading Plan · 按柜按 SKU</span></button>
+      <button class="doc" data-doc="vgm"><b>VGM 申报数据</b><span>VGM = 货重 + 柜自重</span></button>
+      <button class="doc" data-doc="balance"><b>配重报告</b><span>CTU 60/50 校验</span></button>
+      <button class="doc" data-doc="cost"><b>费用汇总</b><span>运费与附加费</span></button>
+      <button class="doc" data-doc="print"><b>3D 装柜图 PDF</b><span>A4 横向 · 可打印贴柜门</span></button>
+      <button class="doc" data-doc="csv"><b>CSV 导出</b><span>给 Excel / ERP</span></button>
+    </div>
+    <div class="row-actions">
+      <button class="btn ghost" id="btnShare">分享给货代</button>
+      <button class="btn primary" id="btnPrint">打印 / 存 PDF</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec">方案历史<span class="hint">主数据改了也能回溯当时算的什么</span></div>
+    <div id="planHistory"></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     数据：主数据 / 订单 / 拼单 / 设置
+     ══════════════════════════════════════════════════════════ -->
+<section class="screen" id="s-data">
+  <div class="tabs" id="dataTabs">
+    <button data-tab="sku" class="on">SKU</button>
+    <button data-tab="order">订单</button>
+    <button data-tab="consol">拼单</button>
+    <button data-tab="setting">设置</button>
+  </div>
+
+  <div class="card" id="pane-sku">
+    <div class="sec">SKU 主数据<span class="hint" id="skuCount"></span></div>
+    <div class="row-actions">
+      <button class="btn ghost sm" id="btnSkuAdd">+ 新建 SKU</button>
+      <button class="btn ghost sm" id="btnSkuCsv">导入 CSV</button>
+      <button class="btn ghost sm" id="btnSkuExport">导出 CSV</button>
+    </div>
+    <div class="kv" id="skuList"></div>
+  </div>
+
+  <div class="card" id="pane-order" hidden>
+    <div class="sec">订单<span class="hint" id="orderCount"></span></div>
+    <div class="row-actions">
+      <button class="btn ghost sm" id="btnOrdAdd">+ 新建订单</button>
+      <button class="btn ghost sm" id="btnOrdCsv">导入 CSV / PI</button>
+    </div>
+    <div class="kv" id="orderList"></div>
+  </div>
+
+  <div class="card" id="pane-consol" hidden>
+    <div class="sec">拼单建议<span class="hint">先目的港，再密度互补</span></div>
+    <div class="field inline">
+      <label>单柜成本 ¥（用于算省多少钱）</label>
+      <input type="number" id="consolCost" step="100" value="18000">
+    </div>
+    <button class="btn primary" id="btnConsol">找拼单</button>
+    <div id="consolOut"></div>
+  </div>
+
+  <div class="card" id="pane-setting" hidden>
+    <div class="sec">设置</div>
+    <div class="grid3">
+      <div class="field"><label>体积重系数</label><input type="number" id="setDivisor" step="100"></div>
+      <div class="field"><label>超长费 ¥/箱</label><input type="number" id="setOversize"></div>
+      <div class="field"><label>监装费 ¥/柜</label><input type="number" id="setMonitor"></div>
+    </div>
+    <div class="field">
+      <label>云端识别 API（实验功能，留空 = 关闭）</label>
+      <input type="url" id="setVisionApi" placeholder="http://localhost:8787">
+      <small>「拍照识别」走这个地址；服务端用 npm run mcp:http 启动。解析结果仅供参考，入库前必须人工核对。</small>
+    </div>
+    <div class="row-actions">
+      <button class="btn primary sm" id="btnSaveSet">保存设置</button>
+      <button class="btn ghost sm" id="btnExportAll">导出全部数据</button>
+      <button class="btn ghost sm" id="btnImportAll">导入数据</button>
+      <button class="btn ghost sm" id="btnSeed">载入示例数据</button>
+    </div>
+    <div class="sec" style="margin-top:14px">工位规范提醒（PRD 4.3）</div>
+    <ul class="tips">
+      <li>手机垂直向下 40–70cm，纸箱放平在秤面上</li>
+      <li>关掉闪光灯（会过曝秤屏数字），用顶部漫射光</li>
+      <li>深蓝或深灰哑光垫板，不要用反光台面</li>
+      <li>一次只放一个箱子；软塌、斜放、堆叠一律拒测</li>
+      <li>测不准 3 次就转人工补录，系统不会替你猜</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════ 底部导航：主流程在前，实验功能放最后 ══════════
+     【测】的摄像头识别是实验功能：依赖受控工位与光线，识别率受环境影响，
+     而【算】【单】【数】是确定性的、任何时候都能用。所以把它排在最后并明确标注，
+     避免用户第一次打开就把成败押在摄像头上。 -->
+<nav class="tabs-bottom">
+  <button data-go="calc" class="on"><b>算</b><span>装柜</span></button>
+  <button data-go="docs"><b>单</b><span>发货</span></button>
+  <button data-go="data"><b>数</b><span>主数据</span></button>
+  <button data-go="measure" class="tab-exp"><b>测</b><span>实验</span></button>
+</nav>
+
+<!-- ══════════ 弹层 ══════════ -->
+<div class="modal" id="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><b id="modalTitle">标题</b><button class="tbtn" id="modalClose">✕</button></div>
+    <div class="sheet-body" id="modalBody"></div>
+    <div class="sheet-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<div id="printArea" class="print-only"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

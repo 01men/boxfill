@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>boxfill — 装柜测算工具 · 该用几个柜、运费多少、怎么拼单最省</title>
+<meta name="description" content="面向小商品外贸与仓储的装箱决策工具。H5 网页端给人用，MCP 服务给 Agent 用，同一套算法算出的结果必然一致。一个复制按钮，接进你的 Agent。">
+<meta property="og:title" content="boxfill — 装柜测算工具">
+<meta property="og:description" content="该用几个柜、运费多少、怎么拼单最省。网页端与 MCP 共用一份算法。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a2540'/%3E%3Crect x='12' y='22' width='40' height='22' rx='2' fill='%2307c160'/%3E%3Cpath d='M12 30h40M26 22v22' stroke='%230a2540' stroke-width='3'/%3E%3C/svg%3E">
+<!-- 本页是站点首页（介绍页），工具本体在 app.html——两者都在 wrangler 的 assets
+     目录 ./h5 下才会上线。内联脚本会被 worker.js 的 CSP（script-src 'self'）拦掉，
+     所以这里的 JS 全部外置。 -->
+<link rel="stylesheet" href="css/intro.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0a2540"/><rect x="12" y="22" width="40" height="22" rx="2" fill="#07c160"/><path d="M12 30h40M26 22v22" stroke="#0a2540" stroke-width="3"/></svg>
+      boxfill
+    </a>
+    <div class="links">
+      <a href="#demo" class="hide-sm">演示</a>
+      <a href="#install" class="hide-sm">接入</a>
+      <a href="#entries" class="hide-sm">三种入口</a>
+      <a href="#features" class="hide-sm">特性</a>
+      <a href="#faq" class="hide-sm">FAQ</a>
+      <a href="#contact">联系</a>
+      <a class="out" href="app.html" rel="noopener">在线使用 ↗</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap" id="top">
+  <h1>该用几个柜，运费多少，<br>怎么<em>拼单</em>最省。</h1>
+  <p>boxfill 是面向小商品外贸与仓储的装箱决策工具。同一套算法两个入口：H5 网页端给人用，MCP 服务给 Agent 用——<b>两端算出的结果必然一致</b>，因为只有一份实现。</p>
+  <div class="ctas">
+    <a class="btn btn-primary btn-lg" href="#install">复制给 Agent 接手 ↓</a>
+    <a class="btn btn-ghost btn-lg" href="#demo">先看它怎么算</a>
+  </div>
+  <div class="live">在线使用 · <a href="app.html" style="text-decoration:none"><code>https://boxfill.ybkkasi.com/app.html</code></a></div>
+</header>
+
+<!-- ── 演示：跑的是真引擎，不是录屏 ───────────────────────── -->
+<section id="demo">
+  <div class="wrap">
+    <div class="kicker">真跑一遍</div>
+    <h2>下面每一个箱子，都是<span class="mark">真排出来的</span></h2>
+    <p class="lead">这页直接 import 了工具本体的装箱引擎和 3D 渲染器——不是录屏，也不是画着玩的示意。
+      切场景会重新跑一次排布，箱数、层数、柜型全是那次求解的结果。</p>
+    <div class="demo-wrap">
+      <div id="demo-mount"></div>
+    </div>
+    <p class="demo-caption" id="demo-caption"></p>
+  </div>
+</section>
+
+<!-- ── 接入：一个按钮 ─────────────────────────────────────── -->
+<section id="install" class="alt">
+  <div class="wrap">
+    <div class="install">
+      <h3>把下面这段话丢给 Agent，剩下的交给它</h3>
+      <p>里面已经写清了 MCP 配置、工具用法和几条必须遵守的约定（单位、费率、限重），
+        不需要你再解释一遍这个工具是干什么的。</p>
+      <div class="row">
+        <button class="copy-big" id="copy-prompt" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="12" height="12" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>复制接入指令</span>
+        </button>
+        <span class="copy-hint" id="copy-hint">复制后粘贴给 Claude Code / WorkBuddy / DSH 等任意 Agent</span>
+      </div>
+
+      <details>
+        <summary><span class="pm">＋</span>想先看看复制的是什么？</summary>
+        <pre id="agent-prompt">我要用 boxfill 做装柜测算（该用几个柜、运费多少、怎么拼单最省）。
+
+仓库在本地，npm 包名 boxfill，线上工具页是 https://boxfill.ybkkasi.com/app.html （首页是介绍页）。
+
+请按仓库 README.md 完成以下步骤：
+
+1) cd 进仓库，跑 `npm install &amp;&amp; npm test`，确认测试全绿（0 失败）再继续。
+
+2) 把 MCP 服务接进你的 MCP 配置（stdio 方式，把路径换成仓库绝对路径）：
+   {"mcpServers":{"boxfill":{"command":"node","args":["&lt;仓库绝对路径&gt;/server/stdio.js"]}}}
+   装完用 `npm run mcp:probe` 自检一次，它会真起一个 client 连上去把工具调通一遍。
+   如果你需要远程或多端共享，改用 `npm run mcp:http`（默认 127.0.0.1:8787/mcp）。
+
+3) 工作流程：
+   · 先 list_containers 查柜型库和限重；
+   · 再 plan_containers 排柜（这是主入口，几个柜、每柜装了什么、利用率、甩单、违规都在这）；
+   · 要钱用 calc_freight；合并订单用 suggest_consolidation；出单据用 gen_docs；
+   · 主数据用 upsert_sku 建档或 import_pi 导入 PI/CSV，用 list_skus / list_orders 查询。
+
+4) 必须遵守的约定：
+   · 单位锁死 cm / kg / CBM，和 H5 完全一致，不要自己换算成 mm；
+   · 柜型写 '20GP' / '40GP' / '40HQ' / '45HQ' / '20OT' / '20FR'，boxType 写 'AUTO' 会自动比选柜型；
+   · 运费必须填真实费率（costs.freightPerCbm / thc / doc 等）。费率全 0 时只出装载方案不出钱，
+     渠道比价和箱型比选会退化成空表——遇到这种情况先问我要费率，不要编；
+   · 限重取四层最小值（箱型上限 / 航线限重 / 船司限重 / 拖车限重）。美线拖车常压到 17.2t，
+     比柜型上限低近 10 吨，不取最小值就会算出超重方案；
+   · 输入不完整会在入口被挡下并说明缺什么（例如 items[0] 尺寸不完整或非正数），
+     看到这类报错是数据问题，不是工具坏了——按提示补齐，不要绕过。
+
+5) 视觉识别（摄像头测尺寸、读电子秤）不在 MCP 里，因为它需要浏览器和 DOM，
+   所以只存在于 H5 的「测」屏、由人确认。你要做这类操作时，
+   请引导用户打开 https://boxfill.ybkkasi.com/app.html 。
+
+细节（算法原理、10 条硬约束、与 PRD 的偏差、已知限制）都在仓库 README.md 里，
+遇到不确定先读它，不要猜。</pre>
+      </details>
+    </div>
+
+    <h2 style="margin-top:64px">自己跑的话，两条命令</h2>
+    <div class="term">
+      <div><span class="p">$</span><span class="c2">npm install</span><span class="c">&amp;&amp; npm start</span></div>
+      <div><span class="p"> </span><span class="c">→ http://localhost:5173/h5/</span></div>
+    </div>
+    <p class="note">H5 端零依赖，只有 MCP 服务端需要 <code>npm install</code>。
+      另有 <code>npm test</code>（算法测试）、<code>npm run mcp</code>（stdio 服务）、
+      <code>npm run mcp:probe</code>（MCP 自检）、<code>npm run deploy</code>（部署并端到端验证）。</p>
+    <p class="note">H5 用的是 ES 模块，浏览器在 <code>file://</code> 下会拒绝加载模块——
+      直接双击一定白屏，必须走静态服务器（<code>npm start</code> 或任意静态服务器）。</p>
+  </div>
+</section>
+
+<!-- ── 三种入口 ─────────────────────────────────────────── -->
+<section id="entries">
+  <div class="wrap">
+    <div class="kicker">入口</div>
+    <h2>三种接入方式，总有一条走得通</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <b>H5 网页端</b>
+        <span>算 / 单 / 数三屏主流程：几柜、运费、拼单建议、3D 装柜图、装箱单与 VGM 导出。断网可用，手机扫码即用。</span>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9"/></svg></div>
+        <b>MCP 服务</b>
+        <span>11 个工具，JSON 进 JSON 出。本机 Agent 走 stdio，远程或多端共享走 Streamable HTTP。</span>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 18l-6-6 6-6M16 6l6 6-6 6"/></svg></div>
+        <b>window.BoxFiller</b>
+        <span>页面挂的 JS API。外部插件可用 URL hash 预填直接跳进来带数据，或调 solve() 直接拿结果。</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Agent 速查 ───────────────────────────────────────── -->
+<section id="agent" class="alt">
+  <div class="wrap">
+    <div class="kicker">给 Agent</div>
+    <h2>工具清单与硬约定</h2>
+    <p class="lead">下面是复制指令里那份清单的原样，方便你在别处查阅。</p>
+    <div class="tblwrap">
+      <table>
+        <thead><tr><th>工具</th><th>作用</th><th>写库</th></tr></thead>
+        <tbody>
+          <tr><td><code>list_containers</code></td><td>查柜型库：内尺寸、门框、可用容积、限重</td><td class="no">—</td></tr>
+          <tr><td><code>plan_containers</code></td><td><b>主入口</b>：几个柜、每柜装了什么、利用率、甩单、违规</td><td class="no">—</td></tr>
+          <tr><td><code>calc_freight</code></td><td>四个重量、渠道比价、箱型比选、附加费、纸箱优化</td><td class="no">—</td></tr>
+          <tr><td><code>suggest_consolidation</code></td><td>拼单建议 + 费用分摊（谁付多少）</td><td class="no">—</td></tr>
+          <tr><td><code>check_fits</code></td><td>箱规能否装进某柜、过不过门框、是否超长</td><td class="no">—</td></tr>
+          <tr><td><code>gen_docs</code></td><td>装箱单 / 装柜清单 / VGM / 配重 / 费用</td><td class="no">—</td></tr>
+          <tr><td><code>upsert_sku</code></td><td>建档或更新 SKU（变更自动留版本）</td><td class="yes">✅</td></tr>
+          <tr><td><code>import_pi</code></td><td>导入 PI/CSV，缺尺寸的行跳过并计数</td><td class="yes">✅</td></tr>
+          <tr><td><code>list_skus</code> / <code>list_orders</code></td><td>查主数据</td><td class="no">—</td></tr>
+          <tr><td><code>get_order_boxes</code></td><td>订单展开成箱规清单，汇总体积与抛比</td><td class="no">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:56px">几条会被算错的约定</h2>
+    <div class="rules">
+      <div class="rule"><b>尺寸单位</b><span>cm</span></div>
+      <div class="rule"><b>重量单位</b><span>kg</span></div>
+      <div class="rule"><b>体积单位</b><span>CBM</span></div>
+      <div class="rule"><b>自动选柜</b><span>boxType "AUTO"</span></div>
+      <div class="rule"><b>限重取最小</b><span>箱型/航线/船司/拖车</span></div>
+      <div class="rule"><b>主数据位置</b><span>~/.boxfill/*.db</span></div>
+    </div>
+    <p class="note">注意：MCP 侧主数据存在 SQLite（默认 <code>~/.boxfill/boxfill.db</code>，可用 <code>BOXFILL_DB</code> 覆盖），
+      H5 侧存在 localStorage，<b>两者是各自独立的主数据，不自动同步</b>。要打通，请在 H5 导出、
+      服务端用 <code>import_pi</code> 导入。另：<code>node:sqlite</code> 需要 Node ≥ 22.5。</p>
+  </div>
+</section>
+
+<!-- ── 为什么 ───────────────────────────────────────────── -->
+<section id="why">
+  <div class="wrap">
+    <div class="kicker">取舍</div>
+    <h2>算得出，还得<strong>摆得出来</strong>。</h2>
+    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+      <div class="card">
+        <b>放弃理论最优</b>
+        <span>很多装箱工具给的是悬空塞缝的数学最优。仓管拿着那张图到现场摆不出来——
+          图上第二层压在第一层的缝里。我们不做这种方案。</span>
+      </div>
+      <div class="card">
+        <b>整层铺满，逐层上堆</b>
+        <span>集装箱只能从门口往里码，物理上本来就是这样。每层铺满、层高定死，
+          仓管照着摆一定摆得出来，而且每层都能出可直接贴到操作台的俯视图。</span>
+      </div>
+      <div class="card">
+        <b>拼单不是凑半柜</b>
+        <span>不是把两个半柜凑成一个柜省一次运费，而是「抛货单 + 重货单」互补，
+          让体积线和重量线同时吃满。所有柜数都来自真实排布，不是体积除法。</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 特性 ─────────────────────────────────────────────── -->
+<section id="features" class="alt">
+  <div class="wrap">
+    <div class="kicker">能力</div>
+    <h2>做了哪些事</h2>
+    <div class="feat">
+      <div>
+        <div class="kicker">01 · 装箱</div>
+        <h3>分层码 + 矩形块，不是通用 3D Bin Packing</h3>
+        <p>每层是 2D 矩形块装箱（每个 SKU 在本层摆一个 nx×ny 的规整矩形块），层与层之间简单堆叠。
+          多起点寻优：体积优先 / 重量优先 / 整除优先 / 混装亲和，四个策略各跑一遍取最优。
+          朝向按「本层箱数 × 剩余高度还能码几层」预估总收益——层高一旦定死就同时决定了还能往上码几层，
+          拿到第一个放得下的朝向就用，会白白少装三成。</p>
+      </div>
+      <div>
+        <div class="kicker">02 · 约束</div>
+        <h3>10 条硬约束 + 四层限重取最小</h3>
+        <p>门框约束、边长整除、整层码放、重下轻上、堆码上限、单层限高（留 5cm 安全余量）、托盘占用、
+          混装禁忌、可用容积折扣、配重校验（前后差 ≤800kg、左右差 ≤500kg、CTU 60/50）。
+          限重取<b>箱型上限 / 航线限重 / 船司限重 / 拖车限重</b>的最小值并在方案里留痕——
+          美线拖车常压到 17.2t，比柜型上限低近 10 吨。</p>
+      </div>
+      <div>
+        <div class="kicker">03 · 拼单</div>
+        <h3>先硬约束，再多单吸收，最后分账</h3>
+        <p>硬约束按目的港分组，船期兼容交给截关缓冲判断；然后贪心合并 + 多单吸收——
+          向已锁定的组继续吸收第三、第四单，只要并入后省的柜数还在增加就继续收。
+          费用分摊按 max(体积线占用率, 承重线占用率) 计算，尾差记到最后一个成员，
+          合计严格等于总成本。每条建议带「按此拼单去测算」按钮，一跳到真实排布，建议和执行之间不留断层。</p>
+      </div>
+      <div>
+        <div class="kicker">04 · 测量</div>
+        <h3>确认制测量：连续检测 + 人工确认</h3>
+        <p>摄像头逐帧找箱体四边形、持续读秤攒稳定读数，状态灯只报结论
+          （未找到 / 质量不过关 / 需标定 / 太斜 / 已锁定）。尺寸换算与入库判定全部推迟到用户点「确认测量」之后——
+          识别太快把没核对过的数直接弹进主数据，比识别不出来更危险。
+          秤屏 OCR 是纯 JS 七段数码管字形模板匹配，合成测试识别率 99.7%、误读 0 例：读不出会明确报错，读错不会发生。</p>
+      </div>
+      <div>
+        <div class="kicker">05 · 交付</div>
+        <h3>单据、3D 图与离线可用</h3>
+        <p>装箱单 / 装柜清单 / VGM / 配重 / 费用 / A4 打印包一次生成，3D 装柜图支持轴测、分层俯视、
+          门端侧视、配重剖面。采集与 OCR 全部跑在端侧，断网可测尺寸、读重量、存结果；
+          主数据、待装清单、方案历史都在 localStorage，断网不丢。存储被禁（无痕模式）时自动退回内存存储，不崩。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 数字 ─────────────────────────────────────────────── -->
+<section id="stats">
+  <div class="wrap">
+    <div class="kicker">工程</div>
+    <h2>几个说明取舍的数</h2>
+    <div class="stats">
+      <div class="stat"><b>1 份实现</b><span>H5 与 MCP 共用 core，不存在两边算出不同柜数</span></div>
+      <div class="stat"><b>290+</b><span>算法测试全绿（npm test，数量随仓库演进增长）</span></div>
+      <div class="stat"><b>99.7%</b><span>七段数码管 OCR 识别率，误读 0 例</span></div>
+      <div class="stat"><b>0 依赖</b><span>H5 端不需要 npm install</span></div>
+    </div>
+    <p class="src">装箱引擎是工程可行解，不是数学最优——整层码放的约束下放弃了悬空塞缝的 3~5% 理论空间，换来仓管照着摆一定摆得出来。</p>
+  </div>
+</section>
+
+<!-- ── FAQ ──────────────────────────────────────────────── -->
+<section id="faq" class="alt">
+  <div class="wrap">
+    <div class="kicker">FAQ</div>
+    <h2>人们最先问的问题</h2>
+    <div class="faq">
+      <details open>
+        <summary>这个工具到底解决什么问题？<span class="pm">＋</span></summary>
+        <div class="a">三个问题：该用几个柜、运费多少钱、怎么拼单最省。
+          面向的场景是小商品外贸与仓储——SKU 多、箱规杂、经常有「这票货能不能塞进一个柜还省一次运费」的判断。</div>
+      </details>
+      <details>
+        <summary>为什么视觉识别排在 H5 而不在 MCP 里？<span class="pm">＋</span></summary>
+        <div class="a">摄像头检测和秤屏 OCR 需要逐像素的 ImageData，来自浏览器的 <code>&lt;video&gt;</code> + <code>canvas</code>；
+          MCP 服务端没有摄像头也没有 DOM。所以「测」留在 H5 由人操作，MCP 只开放「算」——
+          这既是架构约束，也符合实际：确定性要求最高的一环本来就该由人确认。</div>
+      </details>
+      <details>
+        <summary>为什么首页默认是「算」，不是「测」？<span class="pm">＋</span></summary>
+        <div class="a">摄像头识别依赖受控工位与光线，受环境影响较大；而「算 / 单 / 数」是确定性计算，任何时候都能用。
+          不把成败押在自动识别上，也是因为识别太快把没核对过的数弹进主数据，比识别不出来更危险。</div>
+      </details>
+      <details>
+        <summary>H5 和 MCP 的数据是同一份吗？<span class="pm">＋</span></summary>
+        <div class="a">算法是同一份，数据不是。H5 用 localStorage，MCP 用 SQLite（默认 <code>~/.boxfill/boxfill.db</code>），
+          两者各自独立、<b>不自动同步</b>。要打通，请在 H5 导出 CSV，服务端用 <code>import_pi</code> 导入。
+          这条边界是故意的——两个存储层悄悄合并会制造出比不同步更难查的问题。</div>
+      </details>
+      <details>
+        <summary>多个店铺怎么隔离？<span class="pm">＋</span></summary>
+        <div class="a">当前是单库单账本，没有租户隔离。两种做法：每个店铺一个 <code>BOXFILL_DB</code> 文件、各起一个进程（最简单）；
+          或在 HTTP 前挂带鉴权的反代、按 client 身份分库（需改 <code>http.js</code> 的 session 分发）。
+          另外 <b>HTTP 服务默认只监听 127.0.0.1 且没有鉴权</b>——任何能访问端口的客户端都能读写全部主数据，
+          要对外暴露必须自己加鉴权。</div>
+      </details>
+      <details>
+        <summary>算出来运费是 0，为什么？<span class="pm">＋</span></summary>
+        <div class="a">费率没填。费率全 0 时只出装载方案不出钱，渠道比价与箱型比选会退化成空表。
+          在 H5 里去「数 → 费率设置」填真实费率；在 MCP 里通过 <code>plan_containers</code> /
+          <code>calc_freight</code> 的 <code>costs</code> 传入 freightPerCbm、thc、doc 等参数。</div>
+      </details>
+      <details>
+        <summary>为什么报告的是「柜内占用率」而不是「利用率」？<span class="pm">＋</span></summary>
+        <div class="a">因为理论容积不代表装得满。60×40×35 的箱子装 20GP 只能到 65–70%，
+          那是箱型不整除柜内尺寸造成的，不是排布差。报相对理论容积的利用率会让人误以为排布算法有问题，
+          所以界面改为报柜内实际占用率。</div>
+      </details>
+      <details>
+        <summary>还有旧版单箱规计算器吗？<span class="pm">＋</span></summary>
+        <div class="a">有。<code>index.html</code> 是上一代的单箱规装柜计算器（单文件、零依赖、MaxRects 混方向寻优），
+          仍在 <code>http://localhost:5173/index.html</code> 提供，可以直接双击打开。
+          定位不同：它管单箱规的最大装箱数，新 H5 管整票货、多个 SKU、运费与拼单。
+          注意旧版的 hash 参数单位是 <b>mm</b>，与新 H5 的 <b>cm</b> 不同，两套工具不要混用。</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ── 结尾 ─────────────────────────────────────────────── -->
+<section class="final" id="start">
+  <div class="wrap">
+    <h2>从一份 PI，到一个能照着摆的装柜方案</h2>
+    <p class="lead">网页端直接用，或者复制一句话接进 Agent。</p>
+    <div class="ctas" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:30px">
+      <button class="btn btn-primary btn-lg" data-copy-prompt type="button">复制接入指令</button>
+      <a class="btn btn-ghost btn-lg" href="app.html" rel="noopener">在线使用 ↗</a>
+    </div>
+    <p class="note">仓库私有，仅供内部使用。</p>
+  </div>
+</section>
+
+<!-- ── 联系我们 ───────────────────────────────────────────
+     元冰可联系方式走 <contact-channels> 组件（Shadow DOM，样式不外溢）。
+     组件默认配置即元冰可完整渠道（邮箱 / 企微群 / TG 群 + 公众号、TG 群二维码），
+     二维码相对组件脚本目录 contact-channels/assets/ 解析，不需要在页面上写配置——
+     CSP 禁内联脚本，配置若要改，外置到 js/intro.js 里给组件赋 .config。 -->
+<section id="contact">
+  <div class="wrap">
+    <div class="kicker">联系</div>
+    <h2>联系我们</h2>
+    <p class="lead">用法、费率、接入与部署的问题，下面任一渠道都能找到我们。
+      公众号同步版本与用法更新，微信群和 Telegram 群用于日常交流。</p>
+    <contact-channels theme="light" accent="#07c160"></contact-channels>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap cols">
+    <div><b>boxfill</b> · 物流箱体测算工具</div>
+    <div class="right">
+      <a href="app.html" rel="noopener">在线使用</a> ·
+      <a href="#contact">联系我们</a> ·
+      <span>内部使用</span>
+    </div>
+  </div>
+</footer>
+
+<script src="contact-channels/contact-channels.js"></script>
+<script type="module" src="js/intro.js"></script>
+</body>
+</html>
