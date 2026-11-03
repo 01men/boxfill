@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/01men/boxfill/actions"><img src="https://img.shields.io/badge/tests-292%20passed-4c1" alt="292 tests passed"></a>
+  <a href="https://github.com/01men/boxfill/actions"><img src="https://img.shields.io/badge/tests-299%20passed-4c1" alt="299 tests passed"></a>
   <a href="https://github.com/01men/boxfill"><img src="https://img.shields.io/badge/MCP%20tools-12-7c5cff" alt="12 MCP tools"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A522.5-339933" alt="Node.js 22.5+">
@@ -35,7 +35,7 @@
 
 请按仓库 README.md 完成以下步骤：
 
-1) clone 仓库，跑 `npm install && npm test`，确认 292 条测试全绿（0 失败）再继续。
+1) clone 仓库，跑 `npm install && npm test`，确认 299 条测试全绿（0 失败）再继续。
 
 2) 把 MCP 服务接进你的 MCP 配置（stdio 方式，把路径换成仓库绝对路径）：
    {"mcpServers":{"boxfill":{"command":"node","args":["<仓库绝对路径>/server/stdio.js"]}}}
@@ -102,7 +102,7 @@
 ```sh
 npm install      # 仅 MCP 服务端需要依赖；H5 侧仍然零依赖
 npm start        # 起本地服务 → 首页(介绍页) http://localhost:5173/h5/ ，工具在 /h5/app.html
-npm test         # 292 条测试（Node 自带 test runner）
+npm test         # 299 条测试（Node 自带 test runner）
 npm run mcp      # 启动 MCP stdio 服务，供本机 Agent 接入
 npm run deploy   # 部署到 https://boxfill.ybkkasi.com/ 并端到端验证
 ```
@@ -114,6 +114,22 @@ npm run deploy   # 部署到 https://boxfill.ybkkasi.com/ 并端到端验证
 > 必须用 `npm start` 或任意静态服务器访问。
 
 **GitHub 仓库**：https://github.com/01men/boxfill ｜ 许可证 MIT ｜ Node.js ≥ 22.5（`node:sqlite`）
+
+## 装进 DeepSeek Harness
+
+本仓库声明了 `dsh.bundle`，可以直接作为 DSH 插件安装：
+
+```sh
+dsh plugin add github:01men/boxfill
+```
+
+装上后 DSH 会话里的 Agent 能直接调 7 个工具（`boxfill_plan_containers` /
+`boxfill_calc_freight` / `boxfill_suggest_consolidation` / `boxfill_check_fits` /
+`boxfill_list_containers` / `boxfill_list_orders` / `boxfill_get_order_boxes`）。
+
+插件跑的是仓库里 `h5/js/core/` 的同一份引擎 —— **网页端、MCP 服务端、DSH 插件三端结果一致**。
+插件只开纯计算与查询工具，不开建档类（`upsert_sku` / `import_pi`）：主数据是业务事实，
+不该在一次会话里写进内存库然后丢掉；需要持久化主数据请走 MCP 服务端。
 
 ---
 
@@ -165,7 +181,7 @@ server/                        MCP 服务端（见第二章）
 scripts/serve.mjs              零依赖静态服务器
 scripts/deploy.mjs             部署 + 线上验证
 scripts/mcp-probe.mjs          MCP 自检：起 client 连上去真调一次
-tests/*.test.mjs               292 条测试
+tests/*.test.mjs               299 条测试
 ```
 
 分层原则：**算法不碰 DOM，UI 不算账**。装箱、计费、拼单都能在 Node 下被测试穷举；
@@ -317,7 +333,7 @@ PRD 有几处按现实做会出问题，实现时做了调整。**这不是"没�
 - **运费需要填真实费率**。费率全 0 时只出装载方案不出钱，渠道比价与箱型比选会退化成空表。
 - **OCR 只认七段数码管**。电子秤是点阵屏或 LCD 字符屏时识别率会下降，需在 `ocr.js` 里补字形模板。
 - 客户端未做多租户隔离（PRD 11 要求店铺级隔离），当前是单机单人形态，接后端时需要补。
-- 界面主流程的 GUI 自动化点击测试尚未跑通（详见交付说明），核心算法的 292 条测试已覆盖。
+- 界面主流程的 GUI 自动化点击测试尚未跑通（详见交付说明），核心算法的 299 条测试已覆盖。
 
 ---
 
@@ -346,7 +362,7 @@ server/
 
 ```sh
 npm install            # 只装 MCP SDK 与 zod，H5 侧仍是零依赖
-npm test               # 292 条测试
+npm test               # 299 条测试
 npm run mcp:probe      # 自检：真起一个 client 连上去验 16 项
 
 npm run mcp            # stdio 服务（本地 Agent 用）

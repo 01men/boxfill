@@ -1,0 +1,15 @@
+# cordis.patch.yml —— dsh.bundle 安装补丁（dsh plugin add github:01men/boxfill）。
+#
+# 形态说明：
+# - name 用「包名 + 子路径」模块说明符：Node 从 profile 目录出发沿 node_modules 解析
+#   （本包被安装在 <profile>/node_modules/boxfill），无需感知安装位置，开箱可解析。
+# - 本插件只提供模型可见工具（测算装柜 / 运费 / 拼单 / 查柜型 / 查单据），
+#   不启前端面板，因此不声明 dsh.client。
+# - 插件零外部依赖：工具定义按 DSH 原生 ToolRuntime 契约手写，不 import @deepseek-ai/*
+#   （npm 上 dsh-tools 版本与 profile 内置版本不一致，声明依赖会拉错版本）。
+# - 算法与 H5 网页端、MCP 服务端共用仓库内的同一份实现（h5/js/core/*），
+#   三端测算结果必然一致。
+- insert:
+    - id: boxfill-container-packing
+      name: boxfill/dsh-plugin/index.mjs
+      config: {}

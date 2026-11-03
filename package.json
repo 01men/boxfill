@@ -4,6 +4,20 @@
   "description": "物流箱体测算工具 —— 装柜方案、运费与拼单测算；H5 端零依赖，MCP 服务端供 Agent 接入",
   "private": true,
   "type": "module",
+  "files": [
+    "h5/js/core",
+    "h5/js/vision",
+    "server/tools.js",
+    "server/vision.js",
+    "server/png.js",
+    "dsh-plugin/index.mjs",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "scripts": {
     "test": "node --test \"tests/*.test.mjs\"",
     "start": "node scripts/serve.mjs",
