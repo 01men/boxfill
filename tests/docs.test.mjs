@@ -232,7 +232,7 @@ function makeCtx(over = {}) {
       {
         id: 'SO-2026-1001',
         code: 'SO-2026-1001',
-        customer: '义乌小陈贸易',
+        customer: '示例客户（虚构）',
         customerAllowMixed: true,
         port: 'Ningbo',
         vessel: 'COSCO 泰安 V.034W',
@@ -246,7 +246,7 @@ function makeCtx(over = {}) {
       },
     ],
     skus: [SKU_A, SKU_B],
-    customer: { id: 'C-1', name: '义乌小陈贸易', allowMixed: true, rejectMixedReason: '' },
+    customer: { id: 'C-1', name: '示例客户（虚构）', allowMixed: true, rejectMixedReason: '' },
     settings: {
       volumeDivisor: 6000,
       availableRatio: 0.85,
@@ -337,7 +337,7 @@ describe('单据层 · 装箱单', () => {
   const html = buildPackingList(ctx)
 
   it('抬头带出客户、订单、柜型、柜数、船期与截关', () => {
-    for (const s of ['装箱单', 'PACKING LIST', '义乌小陈贸易', 'SO-2026-1001', '40HQ', 'Ningbo', 'COSCO 泰安 V.034W']) {
+    for (const s of ['装箱单', 'PACKING LIST', '示例客户（虚构）', 'SO-2026-1001', '40HQ', 'Ningbo', 'COSCO 泰安 V.034W']) {
       assert.ok(html.includes(s), `装箱单缺少「${s}」`)
     }
     assert.ok(html.includes('2026-10-20 17:00'), '截关时间应印成 2026-10-20 17:00')
@@ -625,7 +625,7 @@ describe('单据层 · A4 打印包', () => {
       assert.ok(bundle.html.includes(s), `打印包缺少「${s}」`)
     }
     assert.ok(bundle.title.includes('SO-2026-1001'))
-    assert.ok(bundle.title.includes('义乌小陈贸易'))
+    assert.ok(bundle.title.includes('示例客户（虚构）'))
     assert.ok(bundle.title.includes('2柜'))
   })
 
